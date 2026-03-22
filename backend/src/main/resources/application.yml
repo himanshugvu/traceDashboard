@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: trace-dashboard-api
+  datasource:
+    url: ${TRACE_DB_URL:jdbc:mariadb://localhost:3306/trace_db}
+    username: ${TRACE_DB_USERNAME:trace_user}
+    password: ${TRACE_DB_PASSWORD:trace_password}
+    driver-class-name: org.mariadb.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    org.hibernate.SQL: warn
