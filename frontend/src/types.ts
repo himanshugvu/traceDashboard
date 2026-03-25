@@ -63,6 +63,7 @@ export type TraceRow = {
   appName: string | null;
   requestTimestamp: string | null;
   status: string | null;
+  httpSeries: string | null;
   requestReceivedLatencyMs: number | null;
   externalLatencyMs: number | null;
   totalLatencyMs: number | null;
@@ -100,6 +101,7 @@ export type TraceDetailResponse = {
   channelResponse: string | null;
   requestTimestamp: string | null;
   status: string | null;
+  httpSeries: string | null;
   requestReceivedLatencyMs: number | null;
   externalLatencyMs: number | null;
   totalLatencyMs: number | null;
@@ -110,8 +112,13 @@ export type TraceFiltersState = {
   appName: string;
   correlationId: string;
   channelId: string;
+  accountQuery: string;
+  customerQuery: string;
   payloadQuery: string;
   globalQuery: string;
+  minTotalLatencyMs: number | null;
+  maxTotalLatencyMs: number | null;
+  exactTotalLatencyMs: number | null;
   from: string;
   to: string;
 };

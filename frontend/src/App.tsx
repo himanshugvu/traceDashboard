@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { TraceLogsScreen } from "./screens/TraceLogsScreen";
 
+type ThemeMode = "light" | "dark";
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function readTheme(): ThemeMode {
+  const stored = window.localStorage.getItem("trace-dashboard-theme");
+  if (stored === "light" || stored === "dark") {
+    return stored;
+  }
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
 function readRoute() {
@@ -19,6 +29,7 @@ export default function App() {
   const [day, setDay] = useState(initialRoute.day);
   const [selectedAppName, setSelectedAppName] = useState(initialRoute.app);
   const [selectedApiName, setSelectedApiName] = useState(initialRoute.api);
+  const [theme, setTheme] = useState<ThemeMode>(() => readTheme());
 
   function syncRoute(nextDay: string, nextApp: string, nextApi: string) {
     const params = new URLSearchParams();
@@ -44,8 +55,17 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  useEffect(() => {
+    window.localStorage.setItem("trace-dashboard-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+    document.documentElement.classList.remove("theme-light", "theme-dark");
+    document.documentElement.classList.add(`theme-${theme}`);
+    document.body.classList.remove("theme-light", "theme-dark");
+    document.body.classList.add(`theme-${theme}`);
+  }, [theme]);
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell theme-${theme}`}>
       <main className="main-shell detail-mode">
         <TraceLogsScreen
           day={day}
@@ -65,6 +85,8 @@ export default function App() {
             setDay(nextDay);
             syncRoute(nextDay, selectedAppName, selectedApiName);
           }}
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
         />
       </main>
     </div>

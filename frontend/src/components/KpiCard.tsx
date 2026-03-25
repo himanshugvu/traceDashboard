@@ -18,7 +18,7 @@ type KpiCardProps = {
 };
 
 function KpiIcon({ kind, tone = "default" }: { kind: KpiIconKind; tone?: "default" | "danger" }) {
-  const stroke = tone === "danger" ? "var(--accent)" : "var(--icon-color)";
+  const stroke = tone === "danger" ? "var(--danger)" : "var(--icon-color)";
 
   if (kind === "success") {
     return (
@@ -107,8 +107,9 @@ function KpiIcon({ kind, tone = "default" }: { kind: KpiIconKind; tone?: "defaul
 }
 
 export function KpiCard({ label, value, subvalue, tone = "default", icon }: KpiCardProps) {
+  const className = `kpi-card kpi-card-${icon}${tone === "danger" ? " danger" : ""}`;
   return (
-    <article className={tone === "danger" ? "kpi-card danger" : "kpi-card"}>
+    <article className={className}>
       <div className="kpi-card-head">
         <span>{label}</span>
         <div className={tone === "danger" ? "kpi-icon danger" : "kpi-icon"}>

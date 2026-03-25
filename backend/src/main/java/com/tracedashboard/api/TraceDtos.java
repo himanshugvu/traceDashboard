@@ -99,6 +99,7 @@ public final class TraceDtos {
         String appName,
         LocalDateTime requestTimestamp,
         String status,
+        String httpSeries,
         Integer requestReceivedLatencyMs,
         Integer externalLatencyMs,
         Integer totalLatencyMs
@@ -118,6 +119,7 @@ public final class TraceDtos {
         String channelResponse,
         LocalDateTime requestTimestamp,
         String status,
+        String httpSeries,
         Integer requestReceivedLatencyMs,
         Integer externalLatencyMs,
         Integer totalLatencyMs

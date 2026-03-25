@@ -6,6 +6,7 @@ INSERT INTO trace_record (
   api_name,
   app_name,
   status,
+  http_series,
   request_payload,
   channel_payload,
   core_payload,
@@ -36,6 +37,11 @@ SELECT
     WHEN MOD(seq.n, 13) = 0 THEN 'FAILURE'
     ELSE 'SUCCESS'
   END AS status,
+  CASE
+    WHEN MOD(seq.n, 20) = 0 THEN '500'
+    WHEN MOD(seq.n, 13) = 0 THEN '400'
+    ELSE '200'
+  END AS http_series,
   CONCAT(
     '{"requestPayload":{"operatorId":"OP-',
     LPAD(MOD(seq.n, 9000) + 1, 4, '0'),

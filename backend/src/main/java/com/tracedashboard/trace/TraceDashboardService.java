@@ -79,8 +79,14 @@ public class TraceDashboardService {
         String apiName,
         String appName,
         String status,
+        String httpSeries,
+        Integer minTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        Integer exactTotalLatencyMs,
         String correlationId,
         String channelId,
+        String accountQuery,
+        String customerQuery,
         String payloadQuery,
         String globalQuery,
         LocalDateTime from,
@@ -88,8 +94,9 @@ public class TraceDashboardService {
         int page,
         int size
     ) {
-        var baseSpecification = buildSearchSpecification(day, apiName, appName, correlationId, channelId, payloadQuery, globalQuery, from, to);
+        var baseSpecification = buildSearchSpecification(day, apiName, appName, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to);
         var querySpecification = andIfPresent(baseSpecification, TraceSpecifications.statusEquals(status));
+        querySpecification = andIfPresent(querySpecification, TraceSpecifications.httpSeriesEquals(httpSeries));
         var cachedOverview = canUseCachedOverview(day, apiName, appName, correlationId, channelId, payloadQuery, globalQuery, from, to)
             ? overviewCacheService.findCachedOverview(day, appName, apiName)
             : null;
@@ -139,6 +146,7 @@ public class TraceDashboardService {
             record.getChannelResponse(),
             record.getRequestTimestamp(),
             determineStatus(record),
+            determineHttpSeries(record),
             record.getRequestReceivedLatencyMs(),
             record.getExternalLatencyMs(),
             record.getTotalLatencyMs()
@@ -149,8 +157,13 @@ public class TraceDashboardService {
         LocalDate day,
         String apiName,
         String appName,
+        Integer minTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        Integer exactTotalLatencyMs,
         String correlationId,
         String channelId,
+        String accountQuery,
+        String customerQuery,
         String payloadQuery,
         String globalQuery,
         LocalDateTime from,
@@ -162,8 +175,13 @@ public class TraceDashboardService {
 
         specification = andIfPresent(specification, TraceSpecifications.apiNameEquals(apiName));
         specification = andIfPresent(specification, TraceSpecifications.appNameEquals(appName));
+        specification = andIfPresent(specification, TraceSpecifications.totalLatencyOnOrAbove(minTotalLatencyMs));
+        specification = andIfPresent(specification, TraceSpecifications.totalLatencyOnOrBelow(maxTotalLatencyMs));
+        specification = andIfPresent(specification, TraceSpecifications.totalLatencyEquals(exactTotalLatencyMs));
         specification = andIfPresent(specification, TraceSpecifications.correlationIdContains(correlationId));
         specification = andIfPresent(specification, TraceSpecifications.channelIdContains(channelId));
+        specification = andIfPresent(specification, TraceSpecifications.accountContains(accountQuery));
+        specification = andIfPresent(specification, TraceSpecifications.customerContains(customerQuery));
         specification = andIfPresent(specification, TraceSpecifications.payloadContains(payloadQuery));
         specification = andIfPresent(specification, TraceSpecifications.anyFieldContains(globalQuery));
 
@@ -223,6 +241,7 @@ public class TraceDashboardService {
             record.getAppName(),
             record.getRequestTimestamp(),
             determineStatus(record),
+            determineHttpSeries(record),
             record.getRequestReceivedLatencyMs(),
             record.getExternalLatencyMs(),
             record.getTotalLatencyMs()
@@ -245,6 +264,21 @@ public class TraceDashboardService {
             return record.getStatus().trim().toUpperCase(Locale.ROOT);
         }
         return isLegacyFailure(record) ? "FAILURE" : "SUCCESS";
+    }
+
+    private String determineHttpSeries(TraceRecord record) {
+        if (record.getHttpSeries() != null && !record.getHttpSeries().isBlank()) {
+            return record.getHttpSeries().trim();
+        }
+        if ("SUCCESS".equals(determineStatus(record))) {
+            return "200";
+        }
+        var response = ((record.getCoreResponse() == null ? "" : record.getCoreResponse()) + " "
+            + (record.getChannelResponse() == null ? "" : record.getChannelResponse())).toLowerCase(Locale.ROOT);
+        if (containsAny(response, "timeout", "unavailable", "system", "gateway", "downstream")) {
+            return "500";
+        }
+        return "400";
     }
 
     private boolean isFailure(TraceRecord record) {

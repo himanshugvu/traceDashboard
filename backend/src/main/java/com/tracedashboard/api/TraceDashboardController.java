@@ -56,8 +56,14 @@ public class TraceDashboardController {
         @RequestParam(required = false) String apiName,
         @RequestParam(required = false) String appName,
         @RequestParam(required = false) String status,
+        @RequestParam(required = false) String httpSeries,
+        @RequestParam(required = false) @Min(0) Integer minTotalLatencyMs,
+        @RequestParam(required = false) @Min(0) Integer maxTotalLatencyMs,
+        @RequestParam(required = false) @Min(0) Integer exactTotalLatencyMs,
         @RequestParam(required = false) String correlationId,
         @RequestParam(required = false) String channelId,
+        @RequestParam(required = false) String accountQuery,
+        @RequestParam(required = false) String customerQuery,
         @RequestParam(required = false) String payloadQuery,
         @RequestParam(required = false) String globalQuery,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
@@ -65,7 +71,7 @@ public class TraceDashboardController {
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size
     ) {
-        return service.search(date, apiName, appName, status, correlationId, channelId, payloadQuery, globalQuery, from, to, page, size);
+        return service.search(date, apiName, appName, status, httpSeries, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to, page, size);
     }
 
     @GetMapping("/traces/{id}")

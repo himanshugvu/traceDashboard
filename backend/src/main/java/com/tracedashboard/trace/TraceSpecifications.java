@@ -87,6 +87,43 @@ public final class TraceSpecifications {
         return (root, query, builder) -> builder.equal(builder.upper(root.get("status")), normalized);
     }
 
+    public static Specification<TraceRecord> httpSeriesEquals(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        var normalized = value.trim();
+        return (root, query, builder) -> builder.equal(root.get("httpSeries"), normalized);
+    }
+
+    public static Specification<TraceRecord> totalLatencyOnOrAbove(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return (root, query, builder) -> builder.greaterThanOrEqualTo(root.get("totalLatencyMs"), value);
+    }
+
+    public static Specification<TraceRecord> totalLatencyOnOrBelow(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return (root, query, builder) -> builder.lessThanOrEqualTo(root.get("totalLatencyMs"), value);
+    }
+
+    public static Specification<TraceRecord> totalLatencyEquals(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return (root, query, builder) -> builder.equal(root.get("totalLatencyMs"), value);
+    }
+
+    public static Specification<TraceRecord> accountContains(String value) {
+        return payloadContains(value);
+    }
+
+    public static Specification<TraceRecord> customerContains(String value) {
+        return payloadContains(value);
+    }
+
     private static Specification<TraceRecord> containsIgnoreCase(String fieldName, String value) {
         if (isBlank(value)) {
             return null;
