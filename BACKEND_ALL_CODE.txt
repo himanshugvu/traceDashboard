@@ -1,0 +1,1396 @@
+# Bundle generated: 2026-04-15 20:45:54
+# Root: C:\Users\himan\Project\codexWin\traceDashboard
+
+====================================================================================================
+FILE: .\backend\pom.xml
+====================================================================================================
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.tracedashboard</groupId>
+    <artifactId>trace-dashboard-api</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>trace-dashboard-api</name>
+    <description>Trace dashboard backend</description>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\TraceDashboardApplication.java
+====================================================================================================
+
+package com.tracedashboard;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@EnableScheduling
+@SpringBootApplication
+public class TraceDashboardApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(TraceDashboardApplication.class, args);
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\api\TraceDashboardController.java
+====================================================================================================
+
+package com.tracedashboard.api;
+
+import com.tracedashboard.trace.TraceDashboardService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Validated
+@RestController
+@RequestMapping("/api/v1")
+public class TraceDashboardController {
+
+    private final TraceDashboardService service;
+
+    public TraceDashboardController(TraceDashboardService service) {
+        this.service = service;
+    }
+
+    @GetMapping("/dashboard")
+    public TraceDtos.DashboardResponse getDashboard(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return service.getDashboard(date);
+    }
+
+    @GetMapping("/traces/filters")
+    public TraceDtos.TraceFiltersResponse getFilters(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) String apiName,
+        @RequestParam(required = false) String appName
+    ) {
+        return service.getFilters(date, apiName, appName);
+    }
+
+    @GetMapping("/traces/overview")
+    public TraceDtos.TraceOverviewResponse getTraceOverview(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) String apiName,
+        @RequestParam(required = false) String appName
+    ) {
+        return service.getTraceOverview(date, apiName, appName);
+    }
+
+    @GetMapping("/traces")
+    public TraceDtos.TraceSearchResponse searchTraces(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) String apiName,
+        @RequestParam(required = false) String appName,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String httpSeries,
+        @RequestParam(required = false) @Min(0) Integer minTotalLatencyMs,
+        @RequestParam(required = false) @Min(0) Integer maxTotalLatencyMs,
+        @RequestParam(required = false) @Min(0) Integer exactTotalLatencyMs,
+        @RequestParam(required = false) String correlationId,
+        @RequestParam(required = false) String channelId,
+        @RequestParam(required = false) String accountQuery,
+        @RequestParam(required = false) String customerQuery,
+        @RequestParam(required = false) String payloadQuery,
+        @RequestParam(required = false) String globalQuery,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size
+    ) {
+        return service.search(date, apiName, appName, status, httpSeries, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to, page, size);
+    }
+
+    @GetMapping("/traces/{id}")
+    public TraceDtos.TraceDetailResponse getTraceDetail(@PathVariable long id) {
+        return service.getTraceDetail(id);
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\api\TraceDtos.java
+====================================================================================================
+
+package com.tracedashboard.api;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public final class TraceDtos {
+
+    private TraceDtos() {
+    }
+
+    public record DashboardResponse(
+        String day,
+        String generatedAt,
+        DashboardKpis kpis,
+        List<ApiSummaryRow> rows
+    ) {
+    }
+
+    public record DashboardKpis(
+        long totalTraces,
+        long uniqueApis,
+        long uniqueApps,
+        LocalDateTime latestRequestTimestamp
+    ) {
+    }
+
+    public record ApiSummaryRow(
+        String apiName,
+        String appName,
+        long traceCount,
+        long successCount,
+        long failureCount,
+        long retriableCount,
+        double successRate,
+        String status,
+        Double avgLatencyMs,
+        long uniqueChannels,
+        long uniqueCorrelations,
+        LocalDateTime latestRequestTimestamp
+    ) {
+    }
+
+    public record TraceFiltersResponse(
+        List<String> apiNames,
+        List<String> appNames,
+        List<String> channelIds
+    ) {
+    }
+
+    public record TraceScopeOption(
+        String appName,
+        String apiName
+    ) {
+    }
+
+    public record TraceOverviewResponse(
+        String day,
+        String generatedAt,
+        String appName,
+        String apiName,
+        long totalRequests,
+        long successCount,
+        long failureCount,
+        Double averageReceivedLatencyMs,
+        Integer maxReceivedLatencyMs,
+        Double averageExternalLatencyMs,
+        Integer maxExternalLatencyMs,
+        Double averageTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        List<TraceScopeOption> scopeOptions
+    ) {
+    }
+
+    public record TraceSearchResponse(
+        String day,
+        String generatedAt,
+        long totalRequests,
+        long successCount,
+        long failureCount,
+        Double averageReceivedLatencyMs,
+        Integer maxReceivedLatencyMs,
+        Double averageExternalLatencyMs,
+        Integer maxExternalLatencyMs,
+        Double averageTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        long totalElements,
+        int totalPages,
+        int page,
+        int size,
+        List<TraceRow> rows
+    ) {
+    }
+
+    public record TraceRow(
+        Long id,
+        String correlationId,
+        String channelId,
+        String apiName,
+        String appName,
+        LocalDateTime requestTimestamp,
+        String status,
+        String httpSeries,
+        Integer requestReceivedLatencyMs,
+        Integer externalLatencyMs,
+        Integer totalLatencyMs
+    ) {
+    }
+
+    public record TraceDetailResponse(
+        Long id,
+        String correlationId,
+        String channelId,
+        String apiName,
+        String appName,
+        String requestPayload,
+        String channelPayload,
+        String corePayload,
+        String coreResponse,
+        String channelResponse,
+        LocalDateTime requestTimestamp,
+        String status,
+        String httpSeries,
+        Integer requestReceivedLatencyMs,
+        Integer externalLatencyMs,
+        Integer totalLatencyMs
+    ) {
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\config\WebConfig.java
+====================================================================================================
+
+package com.tracedashboard.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+            .allowedOrigins("http://localhost:5173")
+            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .allowedHeaders("*");
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\trace\TraceDashboardRepository.java
+====================================================================================================
+
+package com.tracedashboard.trace;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+public interface TraceDashboardRepository extends JpaRepository<TraceRecord, Long>, JpaSpecificationExecutor<TraceRecord> {
+
+    @Query("""
+        select t.apiName as apiName,
+               t.appName as appName,
+               count(t) as traceCount,
+               count(distinct t.channelId) as uniqueChannels,
+               count(distinct t.correlationId) as uniqueCorrelations,
+               max(t.requestTimestamp) as latestRequestTimestamp
+        from TraceRecord t
+        where t.requestTimestamp >= :start and t.requestTimestamp < :end
+        group by t.apiName, t.appName
+        order by count(t) desc, t.apiName asc, t.appName asc
+        """)
+    List<DailyApiSummaryProjection> findDailyApiSummaries(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+        select distinct t.apiName
+        from TraceRecord t
+        where t.requestTimestamp >= :start and t.requestTimestamp < :end
+        order by t.apiName asc
+        """)
+    List<String> findDistinctApiNames(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("""
+        select distinct t.appName
+        from TraceRecord t
+        where t.requestTimestamp >= :start
+          and t.requestTimestamp < :end
+          and (:apiName is null or t.apiName = :apiName)
+        order by t.appName asc
+        """)
+    List<String> findDistinctAppNames(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end,
+        @Param("apiName") String apiName
+    );
+
+    @Query("""
+        select distinct t.channelId
+        from TraceRecord t
+        where t.requestTimestamp >= :start
+          and t.requestTimestamp < :end
+          and (:apiName is null or t.apiName = :apiName)
+          and (:appName is null or t.appName = :appName)
+        order by t.channelId asc
+        """)
+    List<String> findDistinctChannelIds(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end,
+        @Param("apiName") String apiName,
+        @Param("appName") String appName
+    );
+
+    @Query("""
+        select t.appName as appName,
+               t.apiName as apiName,
+               count(t) as totalRequests,
+               sum(case when t.status = 'SUCCESS' then 1 else 0 end) as successCount,
+               sum(case when t.status = 'FAILURE' then 1 else 0 end) as failureCount,
+               avg(t.requestReceivedLatencyMs) as averageReceivedLatencyMs,
+               max(t.requestReceivedLatencyMs) as maxReceivedLatencyMs,
+               avg(t.externalLatencyMs) as averageExternalLatencyMs,
+               max(t.externalLatencyMs) as maxExternalLatencyMs,
+               avg(t.totalLatencyMs) as averageTotalLatencyMs,
+               max(t.totalLatencyMs) as maxTotalLatencyMs
+        from TraceRecord t
+        where t.requestTimestamp >= :start and t.requestTimestamp < :end
+        group by t.appName, t.apiName
+        order by t.appName asc, t.apiName asc
+        """)
+    List<DailyScopeOverviewProjection> findDailyScopeOverviews(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+        select count(t) as totalRequests,
+               sum(case when t.status = 'SUCCESS' then 1 else 0 end) as successCount,
+               sum(case when t.status = 'FAILURE' then 1 else 0 end) as failureCount,
+               avg(t.requestReceivedLatencyMs) as averageReceivedLatencyMs,
+               max(t.requestReceivedLatencyMs) as maxReceivedLatencyMs,
+               avg(t.externalLatencyMs) as averageExternalLatencyMs,
+               max(t.externalLatencyMs) as maxExternalLatencyMs,
+               avg(t.totalLatencyMs) as averageTotalLatencyMs,
+               max(t.totalLatencyMs) as maxTotalLatencyMs
+        from TraceRecord t
+        where t.requestTimestamp >= :start and t.requestTimestamp < :end
+        """)
+    OverallOverviewProjection findDailyOverallOverview(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end
+    );
+
+    interface DailyApiSummaryProjection {
+        String getApiName();
+
+        String getAppName();
+
+        long getTraceCount();
+
+        long getUniqueChannels();
+
+        long getUniqueCorrelations();
+
+        LocalDateTime getLatestRequestTimestamp();
+    }
+
+    interface DailyScopeOverviewProjection {
+        String getAppName();
+
+        String getApiName();
+
+        Long getTotalRequests();
+
+        Long getSuccessCount();
+
+        Long getFailureCount();
+
+        Double getAverageReceivedLatencyMs();
+
+        Integer getMaxReceivedLatencyMs();
+
+        Double getAverageExternalLatencyMs();
+
+        Integer getMaxExternalLatencyMs();
+
+        Double getAverageTotalLatencyMs();
+
+        Integer getMaxTotalLatencyMs();
+    }
+
+    interface OverallOverviewProjection {
+        Long getTotalRequests();
+
+        Long getSuccessCount();
+
+        Long getFailureCount();
+
+        Double getAverageReceivedLatencyMs();
+
+        Integer getMaxReceivedLatencyMs();
+
+        Double getAverageExternalLatencyMs();
+
+        Integer getMaxExternalLatencyMs();
+
+        Double getAverageTotalLatencyMs();
+
+        Integer getMaxTotalLatencyMs();
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\trace\TraceDashboardService.java
+====================================================================================================
+
+package com.tracedashboard.trace;
+
+import com.tracedashboard.api.TraceDtos;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+@Service
+public class TraceDashboardService {
+
+    private final TraceDashboardRepository repository;
+    private final TraceOverviewCacheService overviewCacheService;
+
+    public TraceDashboardService(TraceDashboardRepository repository, TraceOverviewCacheService overviewCacheService) {
+        this.repository = repository;
+        this.overviewCacheService = overviewCacheService;
+    }
+
+    public TraceDtos.DashboardResponse getDashboard(LocalDate day) {
+        var start = day.atStartOfDay();
+        var end = day.plusDays(1).atStartOfDay();
+        var records = repository.findAll(TraceSpecifications.requestTimestampBetween(start, end));
+        var grouped = records.stream()
+            .collect(java.util.stream.Collectors.groupingBy(record -> new ApiKey(record.getApiName(), record.getAppName())));
+
+        var rows = grouped.entrySet().stream()
+            .map((entry) -> toApiSummaryRow(entry.getKey(), entry.getValue()))
+            .sorted(Comparator.comparingLong(TraceDtos.ApiSummaryRow::traceCount).reversed()
+                .thenComparing(TraceDtos.ApiSummaryRow::apiName, Comparator.nullsLast(String::compareTo))
+                .thenComparing(TraceDtos.ApiSummaryRow::appName, Comparator.nullsLast(String::compareTo)))
+            .toList();
+
+        long totalTraces = rows.stream().mapToLong(TraceDtos.ApiSummaryRow::traceCount).sum();
+        long uniqueApis = rows.stream().map(TraceDtos.ApiSummaryRow::apiName).filter(Objects::nonNull).distinct().count();
+        long uniqueApps = rows.stream().map(TraceDtos.ApiSummaryRow::appName).filter(Objects::nonNull).distinct().count();
+        var latest = rows.stream()
+            .map(TraceDtos.ApiSummaryRow::latestRequestTimestamp)
+            .filter(Objects::nonNull)
+            .max(Comparator.naturalOrder())
+            .orElse(null);
+
+        return new TraceDtos.DashboardResponse(
+            day.toString(),
+            Instant.now().toString(),
+            new TraceDtos.DashboardKpis(totalTraces, uniqueApis, uniqueApps, latest),
+            rows
+        );
+    }
+
+    public TraceDtos.TraceFiltersResponse getFilters(LocalDate day, String apiName, String appName) {
+        var start = day.atStartOfDay();
+        var end = day.plusDays(1).atStartOfDay();
+        return new TraceDtos.TraceFiltersResponse(
+            repository.findDistinctApiNames(start, end),
+            repository.findDistinctAppNames(start, end, normalizeBlank(apiName)),
+            repository.findDistinctChannelIds(start, end, normalizeBlank(apiName), normalizeBlank(appName))
+        );
+    }
+
+    public TraceDtos.TraceOverviewResponse getTraceOverview(LocalDate day, String apiName, String appName) {
+        return overviewCacheService.getOverview(day, appName, apiName);
+    }
+
+    public TraceDtos.TraceSearchResponse search(
+        LocalDate day,
+        String apiName,
+        String appName,
+        String status,
+        String httpSeries,
+        Integer minTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        Integer exactTotalLatencyMs,
+        String correlationId,
+        String channelId,
+        String accountQuery,
+        String customerQuery,
+        String payloadQuery,
+        String globalQuery,
+        LocalDateTime from,
+        LocalDateTime to,
+        int page,
+        int size
+    ) {
+        var baseSpecification = buildSearchSpecification(day, apiName, appName, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to);
+        var querySpecification = andIfPresent(baseSpecification, TraceSpecifications.statusEquals(status));
+        querySpecification = andIfPresent(querySpecification, TraceSpecifications.httpSeriesEquals(httpSeries));
+        var cachedOverview = canUseCachedOverview(day, apiName, appName, correlationId, channelId, payloadQuery, globalQuery, from, to)
+            ? overviewCacheService.findCachedOverview(day, appName, apiName)
+            : null;
+
+        var pageable = PageRequest.of(
+            Math.max(page, 0),
+            Math.max(1, Math.min(size, 200)),
+            Sort.by(Sort.Order.desc("requestTimestamp"), Sort.Order.desc("id"))
+        );
+        var tracePage = repository.findAll(querySpecification, pageable);
+        var rows = tracePage.getContent().stream().map(this::toTraceRow).toList();
+
+        return new TraceDtos.TraceSearchResponse(
+            day.toString(),
+            Instant.now().toString(),
+            cachedOverview == null ? 0 : cachedOverview.totalRequests(),
+            cachedOverview == null ? 0 : cachedOverview.successCount(),
+            cachedOverview == null ? 0 : cachedOverview.failureCount(),
+            cachedOverview == null ? null : cachedOverview.averageReceivedLatencyMs(),
+            cachedOverview == null ? null : cachedOverview.maxReceivedLatencyMs(),
+            cachedOverview == null ? null : cachedOverview.averageExternalLatencyMs(),
+            cachedOverview == null ? null : cachedOverview.maxExternalLatencyMs(),
+            cachedOverview == null ? null : cachedOverview.averageTotalLatencyMs(),
+            cachedOverview == null ? null : cachedOverview.maxTotalLatencyMs(),
+            tracePage.getTotalElements(),
+            tracePage.getTotalPages(),
+            tracePage.getNumber(),
+            tracePage.getSize(),
+            rows
+        );
+    }
+
+    public TraceDtos.TraceDetailResponse getTraceDetail(long id) {
+        var record = repository.findById(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Trace not found"));
+
+        return new TraceDtos.TraceDetailResponse(
+            record.getId(),
+            record.getCorrelationId(),
+            record.getChannelId(),
+            record.getApiName(),
+            record.getAppName(),
+            record.getRequestPayload(),
+            record.getChannelPayload(),
+            record.getCorePayload(),
+            record.getCoreResponse(),
+            record.getChannelResponse(),
+            record.getRequestTimestamp(),
+            determineStatus(record),
+            determineHttpSeries(record),
+            record.getRequestReceivedLatencyMs(),
+            record.getExternalLatencyMs(),
+            record.getTotalLatencyMs()
+        );
+    }
+
+    private Specification<TraceRecord> buildSearchSpecification(
+        LocalDate day,
+        String apiName,
+        String appName,
+        Integer minTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        Integer exactTotalLatencyMs,
+        String correlationId,
+        String channelId,
+        String accountQuery,
+        String customerQuery,
+        String payloadQuery,
+        String globalQuery,
+        LocalDateTime from,
+        LocalDateTime to
+    ) {
+        var dayStart = day.atStartOfDay();
+        var dayEnd = day.plusDays(1).atStartOfDay();
+        var specification = Specification.where(TraceSpecifications.requestTimestampBetween(dayStart, dayEnd));
+
+        specification = andIfPresent(specification, TraceSpecifications.apiNameEquals(apiName));
+        specification = andIfPresent(specification, TraceSpecifications.appNameEquals(appName));
+        specification = andIfPresent(specification, TraceSpecifications.totalLatencyOnOrAbove(minTotalLatencyMs));
+        specification = andIfPresent(specification, TraceSpecifications.totalLatencyOnOrBelow(maxTotalLatencyMs));
+        specification = andIfPresent(specification, TraceSpecifications.totalLatencyEquals(exactTotalLatencyMs));
+        specification = andIfPresent(specification, TraceSpecifications.correlationIdContains(correlationId));
+        specification = andIfPresent(specification, TraceSpecifications.channelIdContains(channelId));
+        specification = andIfPresent(specification, TraceSpecifications.accountContains(accountQuery));
+        specification = andIfPresent(specification, TraceSpecifications.customerContains(customerQuery));
+        specification = andIfPresent(specification, TraceSpecifications.payloadContains(payloadQuery));
+        specification = andIfPresent(specification, TraceSpecifications.anyFieldContains(globalQuery));
+
+        if (from != null) {
+            specification = andIfPresent(specification, TraceSpecifications.requestTimestampOnOrAfter(from));
+        }
+        if (to != null) {
+            specification = andIfPresent(specification, TraceSpecifications.requestTimestampOnOrBefore(to));
+        }
+
+        return specification;
+    }
+
+    private TraceDtos.ApiSummaryRow toApiSummaryRow(ApiKey key, List<TraceRecord> records) {
+        long total = records.size();
+        long failures = records.stream().filter(this::isFailure).count();
+        long success = total - failures;
+        long retriable = records.stream().filter(this::isRetriable).count();
+        double successRate = total == 0 ? 0.0 : round2((success * 100.0) / total);
+        var latest = records.stream()
+            .map(TraceRecord::getRequestTimestamp)
+            .filter(Objects::nonNull)
+            .max(Comparator.naturalOrder())
+            .orElse(null);
+        Set<String> channels = new TreeSet<>();
+        Set<String> correlations = new TreeSet<>();
+        for (var record : records) {
+            if (record.getChannelId() != null && !record.getChannelId().isBlank()) {
+                channels.add(record.getChannelId());
+            }
+            if (record.getCorrelationId() != null && !record.getCorrelationId().isBlank()) {
+                correlations.add(record.getCorrelationId());
+            }
+        }
+        return new TraceDtos.ApiSummaryRow(
+            key.apiName(),
+            key.appName(),
+            total,
+            success,
+            failures,
+            retriable,
+            successRate,
+            determineApiStatus(total, failures),
+            averageLatency(records),
+            channels.size(),
+            correlations.size(),
+            latest
+        );
+    }
+
+    private TraceDtos.TraceRow toTraceRow(TraceRecord record) {
+        return new TraceDtos.TraceRow(
+            record.getId(),
+            record.getCorrelationId(),
+            record.getChannelId(),
+            record.getApiName(),
+            record.getAppName(),
+            record.getRequestTimestamp(),
+            determineStatus(record),
+            determineHttpSeries(record),
+            record.getRequestReceivedLatencyMs(),
+            record.getExternalLatencyMs(),
+            record.getTotalLatencyMs()
+        );
+    }
+
+    private String normalizeBlank(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private Specification<TraceRecord> andIfPresent(
+        Specification<TraceRecord> base,
+        Specification<TraceRecord> other
+    ) {
+        return other == null ? base : base.and(other);
+    }
+
+    private String determineStatus(TraceRecord record) {
+        if (record.getStatus() != null && !record.getStatus().isBlank()) {
+            return record.getStatus().trim().toUpperCase(Locale.ROOT);
+        }
+        return isLegacyFailure(record) ? "FAILURE" : "SUCCESS";
+    }
+
+    private String determineHttpSeries(TraceRecord record) {
+        if (record.getHttpSeries() != null && !record.getHttpSeries().isBlank()) {
+            return record.getHttpSeries().trim();
+        }
+        if ("SUCCESS".equals(determineStatus(record))) {
+            return "200";
+        }
+        var response = ((record.getCoreResponse() == null ? "" : record.getCoreResponse()) + " "
+            + (record.getChannelResponse() == null ? "" : record.getChannelResponse())).toLowerCase(Locale.ROOT);
+        if (containsAny(response, "timeout", "unavailable", "system", "gateway", "downstream")) {
+            return "500";
+        }
+        return "400";
+    }
+
+    private boolean isFailure(TraceRecord record) {
+        return "FAILURE".equals(determineStatus(record));
+    }
+
+    private boolean isRetriable(TraceRecord record) {
+        var response = ((record.getCoreResponse() == null ? "" : record.getCoreResponse()) + " "
+            + (record.getChannelResponse() == null ? "" : record.getChannelResponse())).toLowerCase(Locale.ROOT);
+        return containsAny(response, "timeout", "limit", "retry", "temporar");
+    }
+
+    private boolean isLegacyFailure(TraceRecord record) {
+        var response = ((record.getCoreResponse() == null ? "" : record.getCoreResponse()) + " "
+            + (record.getChannelResponse() == null ? "" : record.getChannelResponse())).toLowerCase(Locale.ROOT);
+        return containsAny(response, "error", "failed", "invalid", "reject", "declin");
+    }
+
+    private String determineApiStatus(long total, long failures) {
+        if (total == 0) {
+            return "WARNING";
+        }
+        if (failures == 0) {
+            return "HEALTHY";
+        }
+        if (failures < total) {
+            return "WARNING";
+        }
+        return "CRITICAL";
+    }
+
+    private Double averageLatency(List<TraceRecord> records) {
+        return records.stream()
+            .map(TraceRecord::getTotalLatencyMs)
+            .filter(Objects::nonNull)
+            .mapToInt(Integer::intValue)
+            .average()
+            .stream()
+            .map(this::round2)
+            .boxed()
+            .findFirst()
+            .orElse(0.0);
+    }
+
+    private boolean containsAny(String value, String... needles) {
+        for (var needle : needles) {
+            if (value.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    private boolean canUseCachedOverview(
+        LocalDate day,
+        String apiName,
+        String appName,
+        String correlationId,
+        String channelId,
+        String payloadQuery,
+        String globalQuery,
+        LocalDateTime from,
+        LocalDateTime to
+    ) {
+        return isBlank(correlationId)
+            && isBlank(channelId)
+            && isBlank(payloadQuery)
+            && isBlank(globalQuery)
+            && withinDayBounds(day, from, to);
+    }
+
+    private boolean withinDayBounds(LocalDate day, LocalDateTime from, LocalDateTime to) {
+        var expectedFrom = day.atStartOfDay();
+        var expectedTo = day.atTime(23, 59);
+        return (from == null || from.equals(expectedFrom))
+            && (to == null || to.equals(expectedTo));
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private record ApiKey(String apiName, String appName) {
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\trace\TraceOverviewCacheService.java
+====================================================================================================
+
+package com.tracedashboard.trace;
+
+import com.tracedashboard.api.TraceDtos;
+import jakarta.annotation.PostConstruct;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Service
+public class TraceOverviewCacheService {
+
+    private final TraceDashboardRepository repository;
+    private final Map<OverviewKey, TraceDtos.TraceOverviewResponse> overviewCache = new ConcurrentHashMap<>();
+    private final Map<LocalDate, List<TraceDtos.TraceScopeOption>> scopeOptionsCache = new ConcurrentHashMap<>();
+    private final Set<LocalDate> trackedDays = ConcurrentHashMap.newKeySet();
+
+    public TraceOverviewCacheService(TraceDashboardRepository repository) {
+        this.repository = repository;
+    }
+
+    @PostConstruct
+    public void warmCache() {
+        trackedDays.add(LocalDate.now());
+        trackedDays.add(LocalDate.now().minusDays(1));
+        refreshTrackedDays();
+    }
+
+    @Scheduled(fixedDelay = 60000L, initialDelay = 60000L)
+    public void refreshTrackedDays() {
+        trackedDays.forEach(this::refreshDay);
+    }
+
+    public TraceDtos.TraceOverviewResponse getOverview(LocalDate day, String appName, String apiName) {
+        trackedDays.add(day);
+        if (!scopeOptionsCache.containsKey(day)) {
+            refreshDay(day);
+        }
+
+        var key = new OverviewKey(day, normalize(appName), normalize(apiName));
+        var cached = overviewCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        refreshDay(day);
+        return overviewCache.getOrDefault(
+            key,
+            emptyOverview(day, normalize(appName), normalize(apiName), scopeOptionsCache.getOrDefault(day, List.of()))
+        );
+    }
+
+    public TraceOverviewSnapshot findCachedOverview(LocalDate day, String appName, String apiName) {
+        var normalizedApp = normalize(appName);
+        var normalizedApi = normalize(apiName);
+        var cached = overviewCache.get(new OverviewKey(day, normalizedApp, normalizedApi));
+        if (cached == null) {
+            return null;
+        }
+        return new TraceOverviewSnapshot(
+            cached.totalRequests(),
+            cached.successCount(),
+            cached.failureCount(),
+            cached.averageReceivedLatencyMs(),
+            cached.maxReceivedLatencyMs(),
+            cached.averageExternalLatencyMs(),
+            cached.maxExternalLatencyMs(),
+            cached.averageTotalLatencyMs(),
+            cached.maxTotalLatencyMs()
+        );
+    }
+
+    private void refreshDay(LocalDate day) {
+        var start = day.atStartOfDay();
+        var end = day.plusDays(1).atStartOfDay();
+        var scopeRows = repository.findDailyScopeOverviews(start, end);
+        var scopeOptions = scopeRows.stream()
+            .map(row -> new TraceDtos.TraceScopeOption(row.getAppName(), row.getApiName()))
+            .sorted(Comparator.comparing(TraceDtos.TraceScopeOption::appName, Comparator.nullsLast(String::compareTo))
+                .thenComparing(TraceDtos.TraceScopeOption::apiName, Comparator.nullsLast(String::compareTo)))
+            .toList();
+        scopeOptionsCache.put(day, scopeOptions);
+
+        var generatedAt = Instant.now().toString();
+        overviewCache.put(
+            new OverviewKey(day, "", ""),
+            toOverview(day, "", "", repository.findDailyOverallOverview(start, end), scopeOptions, generatedAt)
+        );
+
+        for (var row : scopeRows) {
+            overviewCache.put(
+                new OverviewKey(day, normalize(row.getAppName()), normalize(row.getApiName())),
+                new TraceDtos.TraceOverviewResponse(
+                    day.toString(),
+                    generatedAt,
+                    row.getAppName(),
+                    row.getApiName(),
+                    longValue(row.getTotalRequests()),
+                    longValue(row.getSuccessCount()),
+                    longValue(row.getFailureCount()),
+                    round2(row.getAverageReceivedLatencyMs()),
+                    intValue(row.getMaxReceivedLatencyMs()),
+                    round2(row.getAverageExternalLatencyMs()),
+                    intValue(row.getMaxExternalLatencyMs()),
+                    round2(row.getAverageTotalLatencyMs()),
+                    intValue(row.getMaxTotalLatencyMs()),
+                    scopeOptions
+                )
+            );
+        }
+    }
+
+    private TraceDtos.TraceOverviewResponse toOverview(
+        LocalDate day,
+        String appName,
+        String apiName,
+        TraceDashboardRepository.OverallOverviewProjection row,
+        List<TraceDtos.TraceScopeOption> scopeOptions,
+        String generatedAt
+    ) {
+        return new TraceDtos.TraceOverviewResponse(
+            day.toString(),
+            generatedAt,
+            appName,
+            apiName,
+            row == null ? 0 : longValue(row.getTotalRequests()),
+            row == null ? 0 : longValue(row.getSuccessCount()),
+            row == null ? 0 : longValue(row.getFailureCount()),
+            row == null ? 0.0 : round2(row.getAverageReceivedLatencyMs()),
+            row == null ? 0 : intValue(row.getMaxReceivedLatencyMs()),
+            row == null ? 0.0 : round2(row.getAverageExternalLatencyMs()),
+            row == null ? 0 : intValue(row.getMaxExternalLatencyMs()),
+            row == null ? 0.0 : round2(row.getAverageTotalLatencyMs()),
+            row == null ? 0 : intValue(row.getMaxTotalLatencyMs()),
+            scopeOptions
+        );
+    }
+
+    private TraceDtos.TraceOverviewResponse emptyOverview(
+        LocalDate day,
+        String appName,
+        String apiName,
+        List<TraceDtos.TraceScopeOption> scopeOptions
+    ) {
+        return new TraceDtos.TraceOverviewResponse(
+            day.toString(),
+            Instant.now().toString(),
+            appName,
+            apiName,
+            0,
+            0,
+            0,
+            0.0,
+            0,
+            0.0,
+            0,
+            0.0,
+            0,
+            scopeOptions
+        );
+    }
+
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? "" : value.trim();
+    }
+
+    private Double round2(Double value) {
+        if (value == null) {
+            return 0.0;
+        }
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    private long longValue(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private int intValue(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private record OverviewKey(LocalDate day, String appName, String apiName) {
+    }
+
+    public record TraceOverviewSnapshot(
+        long totalRequests,
+        long successCount,
+        long failureCount,
+        Double averageReceivedLatencyMs,
+        Integer maxReceivedLatencyMs,
+        Double averageExternalLatencyMs,
+        Integer maxExternalLatencyMs,
+        Double averageTotalLatencyMs,
+        Integer maxTotalLatencyMs
+    ) {
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\trace\TraceRecord.java
+====================================================================================================
+
+package com.tracedashboard.trace;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "trace_record")
+public class TraceRecord {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "correlation_id")
+    private String correlationId;
+
+    @Column(name = "channel_id")
+    private String channelId;
+
+    @Column(name = "api_name")
+    private String apiName;
+
+    @Column(name = "app_name")
+    private String appName;
+
+    @Column(name = "status")
+    private String status;
+
+    @Column(name = "http_series")
+    private String httpSeries;
+
+    @Column(name = "request_payload", columnDefinition = "LONGTEXT")
+    private String requestPayload;
+
+    @Column(name = "channel_payload", columnDefinition = "LONGTEXT")
+    private String channelPayload;
+
+    @Column(name = "core_payload", columnDefinition = "LONGTEXT")
+    private String corePayload;
+
+    @Column(name = "core_response", columnDefinition = "LONGTEXT")
+    private String coreResponse;
+
+    @Column(name = "channel_response", columnDefinition = "LONGTEXT")
+    private String channelResponse;
+
+    @Column(name = "requesttimestamp")
+    private LocalDateTime requestTimestamp;
+
+    @Column(name = "request_received_latency_ms")
+    private Integer requestReceivedLatencyMs;
+
+    @Column(name = "external_latency_ms")
+    private Integer externalLatencyMs;
+
+    @Column(name = "total_latency_ms")
+    private Integer totalLatencyMs;
+
+    protected TraceRecord() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getCorrelationId() {
+        return correlationId;
+    }
+
+    public String getChannelId() {
+        return channelId;
+    }
+
+    public String getApiName() {
+        return apiName;
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public String getHttpSeries() {
+        return httpSeries;
+    }
+
+    public String getRequestPayload() {
+        return requestPayload;
+    }
+
+    public String getChannelPayload() {
+        return channelPayload;
+    }
+
+    public String getCorePayload() {
+        return corePayload;
+    }
+
+    public String getCoreResponse() {
+        return coreResponse;
+    }
+
+    public String getChannelResponse() {
+        return channelResponse;
+    }
+
+    public LocalDateTime getRequestTimestamp() {
+        return requestTimestamp;
+    }
+
+    public Integer getRequestReceivedLatencyMs() {
+        return requestReceivedLatencyMs;
+    }
+
+    public Integer getExternalLatencyMs() {
+        return externalLatencyMs;
+    }
+
+    public Integer getTotalLatencyMs() {
+        return totalLatencyMs;
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\java\com\tracedashboard\trace\TraceSpecifications.java
+====================================================================================================
+
+package com.tracedashboard.trace;
+
+import org.springframework.data.jpa.domain.Specification;
+
+import java.time.LocalDateTime;
+import java.util.Locale;
+
+public final class TraceSpecifications {
+
+    private TraceSpecifications() {
+    }
+
+    public static Specification<TraceRecord> requestTimestampBetween(LocalDateTime from, LocalDateTime toExclusive) {
+        return (root, query, builder) -> builder.and(
+            builder.greaterThanOrEqualTo(root.get("requestTimestamp"), from),
+            builder.lessThan(root.get("requestTimestamp"), toExclusive)
+        );
+    }
+
+    public static Specification<TraceRecord> requestTimestampOnOrAfter(LocalDateTime from) {
+        return (root, query, builder) -> builder.greaterThanOrEqualTo(root.get("requestTimestamp"), from);
+    }
+
+    public static Specification<TraceRecord> requestTimestampOnOrBefore(LocalDateTime to) {
+        return (root, query, builder) -> builder.lessThanOrEqualTo(root.get("requestTimestamp"), to);
+    }
+
+    public static Specification<TraceRecord> apiNameEquals(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        return (root, query, builder) -> builder.equal(root.get("apiName"), value.trim());
+    }
+
+    public static Specification<TraceRecord> appNameEquals(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        return (root, query, builder) -> builder.equal(root.get("appName"), value.trim());
+    }
+
+    public static Specification<TraceRecord> channelIdContains(String value) {
+        return containsIgnoreCase("channelId", value);
+    }
+
+    public static Specification<TraceRecord> correlationIdContains(String value) {
+        return containsIgnoreCase("correlationId", value);
+    }
+
+    public static Specification<TraceRecord> payloadContains(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        var needle = "%" + value.trim().toLowerCase(Locale.ROOT) + "%";
+        return (root, query, builder) -> builder.or(
+            builder.like(builder.lower(root.get("requestPayload")), needle),
+            builder.like(builder.lower(root.get("channelPayload")), needle),
+            builder.like(builder.lower(root.get("corePayload")), needle),
+            builder.like(builder.lower(root.get("coreResponse")), needle),
+            builder.like(builder.lower(root.get("channelResponse")), needle)
+        );
+    }
+
+    public static Specification<TraceRecord> anyFieldContains(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        var needle = "%" + value.trim().toLowerCase(Locale.ROOT) + "%";
+        return (root, query, builder) -> builder.or(
+            builder.like(builder.lower(root.get("correlationId")), needle),
+            builder.like(builder.lower(root.get("channelId")), needle),
+            builder.like(builder.lower(root.get("apiName")), needle),
+            builder.like(builder.lower(root.get("appName")), needle),
+            builder.like(builder.lower(root.get("requestPayload")), needle),
+            builder.like(builder.lower(root.get("channelPayload")), needle),
+            builder.like(builder.lower(root.get("corePayload")), needle),
+            builder.like(builder.lower(root.get("coreResponse")), needle),
+            builder.like(builder.lower(root.get("channelResponse")), needle)
+        );
+    }
+
+    public static Specification<TraceRecord> statusEquals(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        var normalized = value.trim().toUpperCase(Locale.ROOT);
+        return (root, query, builder) -> builder.equal(builder.upper(root.get("status")), normalized);
+    }
+
+    public static Specification<TraceRecord> httpSeriesEquals(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        var normalized = value.trim();
+        return (root, query, builder) -> builder.equal(root.get("httpSeries"), normalized);
+    }
+
+    public static Specification<TraceRecord> totalLatencyOnOrAbove(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return (root, query, builder) -> builder.greaterThanOrEqualTo(root.get("totalLatencyMs"), value);
+    }
+
+    public static Specification<TraceRecord> totalLatencyOnOrBelow(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return (root, query, builder) -> builder.lessThanOrEqualTo(root.get("totalLatencyMs"), value);
+    }
+
+    public static Specification<TraceRecord> totalLatencyEquals(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return (root, query, builder) -> builder.equal(root.get("totalLatencyMs"), value);
+    }
+
+    public static Specification<TraceRecord> accountContains(String value) {
+        return payloadContains(value);
+    }
+
+    public static Specification<TraceRecord> customerContains(String value) {
+        return payloadContains(value);
+    }
+
+    private static Specification<TraceRecord> containsIgnoreCase(String fieldName, String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        var needle = "%" + value.trim().toLowerCase(Locale.ROOT) + "%";
+        return (root, query, builder) -> builder.like(builder.lower(root.get(fieldName)), needle);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+}
+
+
+====================================================================================================
+FILE: .\backend\src\main\resources\application.yml
+====================================================================================================
+
+spring:
+  application:
+    name: trace-dashboard-api
+  datasource:
+    url: ${TRACE_DB_URL:jdbc:mariadb://localhost:3306/trace_db}
+    username: ${TRACE_DB_USERNAME:trace_user}
+    password: ${TRACE_DB_PASSWORD:trace_password}
+    driver-class-name: org.mariadb.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+
+
+

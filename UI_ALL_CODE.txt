@@ -1,0 +1,4626 @@
+# Bundle generated: 2026-04-15 20:45:55
+# Root: C:\Users\himan\Project\codexWin\traceDashboard
+
+====================================================================================================
+FILE: .\frontend\index.html
+====================================================================================================
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trace Dashboard</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+====================================================================================================
+FILE: .\frontend\package.json
+====================================================================================================
+
+{
+  "name": "trace-dashboard-ui",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4"
+  }
+}
+
+
+====================================================================================================
+FILE: .\frontend\tsconfig.json
+====================================================================================================
+
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "vite.config.ts"]
+}
+
+
+====================================================================================================
+FILE: .\frontend\vite.config.ts
+====================================================================================================
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5174,
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true
+      }
+    }
+  }
+});
+
+
+====================================================================================================
+FILE: .\frontend\src\api.ts
+====================================================================================================
+
+export async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+
+====================================================================================================
+FILE: .\frontend\src\App.tsx
+====================================================================================================
+
+import { useEffect, useState } from "react";
+import { TraceLogsScreen } from "./screens/TraceLogsScreen";
+
+type ThemeMode = "light" | "dark";
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function readTheme(): ThemeMode {
+  const stored = window.localStorage.getItem("trace-dashboard-theme");
+  if (stored === "light" || stored === "dark") {
+    return stored;
+  }
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function readRoute() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    day: params.get("day") || todayIso(),
+    app: params.get("app") || "",
+    api: params.get("api") || ""
+  };
+}
+
+export default function App() {
+  const initialRoute = readRoute();
+  const [day, setDay] = useState(initialRoute.day);
+  const [selectedAppName, setSelectedAppName] = useState(initialRoute.app);
+  const [selectedApiName, setSelectedApiName] = useState(initialRoute.api);
+  const [theme, setTheme] = useState<ThemeMode>(() => readTheme());
+
+  function syncRoute(nextDay: string, nextApp: string, nextApi: string) {
+    const params = new URLSearchParams();
+    params.set("day", nextDay);
+    if (nextApp) {
+      params.set("app", nextApp);
+    }
+    if (nextApi) {
+      params.set("api", nextApi);
+    }
+    const query = params.toString();
+    window.history.pushState({}, "", query ? `?${query}` : window.location.pathname);
+  }
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const route = readRoute();
+      setDay(route.day);
+      setSelectedAppName(route.app);
+      setSelectedApiName(route.api);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("trace-dashboard-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+    document.documentElement.classList.remove("theme-light", "theme-dark");
+    document.documentElement.classList.add(`theme-${theme}`);
+    document.body.classList.remove("theme-light", "theme-dark");
+    document.body.classList.add(`theme-${theme}`);
+  }, [theme]);
+
+  return (
+    <div className={`app-shell theme-${theme}`}>
+      <main className="main-shell detail-mode">
+        <TraceLogsScreen
+          day={day}
+          initialAppName={selectedAppName}
+          initialApiName={selectedApiName}
+          onBack={() => {
+            setSelectedAppName("");
+            setSelectedApiName("");
+            syncRoute(day, "", "");
+          }}
+          onScopeChange={(nextApp, nextApi) => {
+            setSelectedAppName(nextApp);
+            setSelectedApiName(nextApi);
+            syncRoute(day, nextApp, nextApi);
+          }}
+          onDayChange={(nextDay) => {
+            setDay(nextDay);
+            syncRoute(nextDay, selectedAppName, selectedApiName);
+          }}
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+        />
+      </main>
+    </div>
+  );
+}
+
+
+====================================================================================================
+FILE: .\frontend\src\main.tsx
+====================================================================================================
+
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./styles/app.css";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+====================================================================================================
+FILE: .\frontend\src\types.ts
+====================================================================================================
+
+export type DashboardKpis = {
+  totalTraces: number;
+  uniqueApis: number;
+  uniqueApps: number;
+  latestRequestTimestamp: string | null;
+};
+
+export type ApiSummaryRow = {
+  apiName: string;
+  appName: string;
+  traceCount: number;
+  successCount: number;
+  failureCount: number;
+  retriableCount: number;
+  successRate: number;
+  status: string;
+  avgLatencyMs: number | null;
+  uniqueChannels: number;
+  uniqueCorrelations: number;
+  latestRequestTimestamp: string | null;
+};
+
+export type DashboardResponse = {
+  day: string;
+  generatedAt: string;
+  kpis: DashboardKpis;
+  rows: ApiSummaryRow[];
+};
+
+export type TraceFiltersResponse = {
+  apiNames: string[];
+  appNames: string[];
+  channelIds: string[];
+};
+
+export type TraceScopeOption = {
+  appName: string;
+  apiName: string;
+};
+
+export type TraceOverviewResponse = {
+  day: string;
+  generatedAt: string;
+  appName: string;
+  apiName: string;
+  totalRequests: number;
+  successCount: number;
+  failureCount: number;
+  averageReceivedLatencyMs: number | null;
+  maxReceivedLatencyMs: number | null;
+  averageExternalLatencyMs: number | null;
+  maxExternalLatencyMs: number | null;
+  averageTotalLatencyMs: number | null;
+  maxTotalLatencyMs: number | null;
+  scopeOptions: TraceScopeOption[];
+};
+
+export type TraceRow = {
+  id: number;
+  correlationId: string | null;
+  channelId: string | null;
+  apiName: string | null;
+  appName: string | null;
+  requestTimestamp: string | null;
+  status: string | null;
+  httpSeries: string | null;
+  requestReceivedLatencyMs: number | null;
+  externalLatencyMs: number | null;
+  totalLatencyMs: number | null;
+};
+
+export type TraceSearchResponse = {
+  day: string;
+  generatedAt: string;
+  totalRequests: number;
+  successCount: number;
+  failureCount: number;
+  averageReceivedLatencyMs: number | null;
+  maxReceivedLatencyMs: number | null;
+  averageExternalLatencyMs: number | null;
+  maxExternalLatencyMs: number | null;
+  averageTotalLatencyMs: number | null;
+  maxTotalLatencyMs: number | null;
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  size: number;
+  rows: TraceRow[];
+};
+
+export type TraceDetailResponse = {
+  id: number;
+  correlationId: string | null;
+  channelId: string | null;
+  apiName: string | null;
+  appName: string | null;
+  requestPayload: string | null;
+  channelPayload: string | null;
+  corePayload: string | null;
+  coreResponse: string | null;
+  channelResponse: string | null;
+  requestTimestamp: string | null;
+  status: string | null;
+  httpSeries: string | null;
+  requestReceivedLatencyMs: number | null;
+  externalLatencyMs: number | null;
+  totalLatencyMs: number | null;
+};
+
+export type TraceFiltersState = {
+  apiName: string;
+  appName: string;
+  correlationId: string;
+  channelId: string;
+  accountQuery: string;
+  customerQuery: string;
+  payloadQuery: string;
+  globalQuery: string;
+  minTotalLatencyMs: number | null;
+  maxTotalLatencyMs: number | null;
+  exactTotalLatencyMs: number | null;
+  from: string;
+  to: string;
+};
+
+
+====================================================================================================
+FILE: .\frontend\src\vite-env.d.ts
+====================================================================================================
+
+/// <reference types="vite/client" />
+
+
+====================================================================================================
+FILE: .\frontend\src\components\KpiCard.tsx
+====================================================================================================
+
+type KpiIconKind =
+  | "total"
+  | "success"
+  | "failure"
+  | "rate"
+  | "apps"
+  | "apis"
+  | "received"
+  | "external"
+  | "latency";
+
+type KpiCardProps = {
+  label: string;
+  value: string;
+  subvalue?: string;
+  tone?: "default" | "danger";
+  icon: KpiIconKind;
+};
+
+function KpiIcon({ kind, tone = "default" }: { kind: KpiIconKind; tone?: "default" | "danger" }) {
+  const stroke = tone === "danger" ? "var(--danger)" : "var(--icon-color)";
+
+  if (kind === "success") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <path d="M8.4 12.1 10.8 14.6 15.9 9.5" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (kind === "failure") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4.2 20 18.5H4z" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M12 9v4.9" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="12" cy="16.8" r="1" fill={stroke} />
+      </svg>
+    );
+  }
+
+  if (kind === "rate") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7.2 17.2 16.8 7.1" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        <circle cx="8" cy="8" r="2.4" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <circle cx="16" cy="16" r="2.4" fill="none" stroke={stroke} strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  if (kind === "apps") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4.5" y="4.5" width="6.2" height="6.2" rx="1.2" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <rect x="13.3" y="4.5" width="6.2" height="6.2" rx="1.2" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <rect x="4.5" y="13.3" width="6.2" height="6.2" rx="1.2" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <rect x="13.3" y="13.3" width="6.2" height="6.2" rx="1.2" fill="none" stroke={stroke} strokeWidth="1.8" />
+      </svg>
+    );
+  }
+
+  if (kind === "apis") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="6.5" cy="12" r="2.2" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <circle cx="17.5" cy="6.8" r="2.2" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <circle cx="17.5" cy="17.2" r="2.2" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <path d="M8.7 11.1 15.2 7.7M8.7 12.9l6.5 3.4" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (kind === "received") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.2 6.3 8.1 16.4" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M18.2 13.6v4.1h-4.1" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (kind === "external") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 17 17.1 6.9" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M12.9 6.9H17v4.1" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (kind === "latency") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="13" r="7.5" fill="none" stroke={stroke} strokeWidth="1.8" />
+        <path d="M12 13V9.1M9.3 3.8h5.4" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+        <path d="m12 13 3 2.2" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.2 7.2h11.6M6.2 12h11.6M6.2 16.8h11.6" fill="none" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function KpiCard({ label, value, subvalue, tone = "default", icon }: KpiCardProps) {
+  const className = `kpi-card kpi-card-${icon}${tone === "danger" ? " danger" : ""}`;
+  return (
+    <article className={className}>
+      <div className="kpi-card-head">
+        <span>{label}</span>
+        <div className={tone === "danger" ? "kpi-icon danger" : "kpi-icon"}>
+          <KpiIcon kind={icon} tone={tone} />
+        </div>
+      </div>
+      <strong>{value}</strong>
+      {subvalue ? <small>{subvalue}</small> : null}
+    </article>
+  );
+}
+
+
+====================================================================================================
+FILE: .\frontend\src\components\PayloadPanel.tsx
+====================================================================================================
+
+type PayloadPanelProps = {
+  eyebrow?: string;
+  title: string;
+  value: string | null | undefined;
+  className?: string;
+};
+
+function formatPayload(value: string | null | undefined) {
+  if (!value || !value.trim()) {
+    return "No data available.";
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+export function PayloadPanel({ eyebrow, title, value, className }: PayloadPanelProps) {
+  return (
+    <section className={className ? `payload-panel ${className}` : "payload-panel"}>
+      <div className="payload-header">
+        {eyebrow ? <p>{eyebrow}</p> : null}
+        <h4>{title}</h4>
+      </div>
+      <pre>{formatPayload(value)}</pre>
+    </section>
+  );
+}
+
+
+====================================================================================================
+FILE: .\frontend\src\components\StatCard.tsx
+====================================================================================================
+
+type StatCardProps = {
+  label: string;
+  value: string;
+  tone: "neutral" | "accent" | "warm";
+};
+
+export function StatCard({ label, value, tone }: StatCardProps) {
+  return (
+    <article className={`stat-card stat-card-${tone}`}>
+      <span className="stat-label">{label}</span>
+      <strong className="stat-value">{value}</strong>
+    </article>
+  );
+}
+
+
+====================================================================================================
+FILE: .\frontend\src\screens\DashboardScreen.tsx
+====================================================================================================
+
+import { useEffect, useState } from "react";
+import { fetchJson } from "../api";
+import { KpiCard } from "../components/KpiCard";
+import type { DashboardResponse } from "../types";
+
+type DashboardScreenProps = {
+  day: string;
+  onDayChange: (day: string) => void;
+  onOpenLogs: (appName: string, apiName: string) => void;
+};
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayIso() {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function formatNumber(value: number | null | undefined) {
+  return new Intl.NumberFormat().format(value ?? 0);
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return "--";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(new Date(value));
+}
+
+function exportCsv(rows: DashboardResponse["rows"], day: string) {
+  const csvLines = [
+    ["App Name", "API Name", "Total", "Success", "Failures"].join(","),
+    ...rows.map((row) =>
+      [row.appName, row.apiName, row.traceCount, row.successCount, row.failureCount]
+        .map((value) => `"${String(value ?? "").replaceAll("\"", "\"\"")}"`)
+        .join(",")
+    )
+  ];
+
+  const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `trace-breakdown-${day}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+export function DashboardScreen({ day, onDayChange, onOpenLogs }: DashboardScreenProps) {
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    fetchJson<DashboardResponse>(`/api/v1/dashboard?date=${day}&refreshToken=${refreshToken}`, controller.signal)
+      .then(setData)
+      .catch((nextError) => {
+        if (!controller.signal.aborted) {
+          setError(nextError instanceof Error ? nextError.message : String(nextError));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [day, refreshToken]);
+
+  const rows = data?.rows ?? [];
+  const totalSuccess = rows.reduce((sum, row) => sum + (row.successCount ?? 0), 0);
+  const totalFailures = rows.reduce((sum, row) => sum + (row.failureCount ?? 0), 0);
+  const successRate = (data?.kpis.totalTraces ?? 0) === 0 ? 0 : (totalSuccess * 100) / (data?.kpis.totalTraces ?? 0);
+
+  return (
+    <section className="screen-shell">
+      <div className="trace-toolbar">
+        <div className="trace-toolbar-left">
+          <div className="brand trace-toolbar-brand">
+            <div className="brand-mark">TD</div>
+          </div>
+
+          <div className="trace-toolbar-title">
+            <strong>Dashboard</strong>
+          </div>
+        </div>
+
+        <div className="trace-toolbar-actions">
+          <div className="day-toggle">
+            <span>Day:</span>
+            <button
+              className={day === todayIso() ? "chip-button active" : "chip-button"}
+              type="button"
+              onClick={() => onDayChange(todayIso())}
+            >
+              Today
+            </button>
+            <button
+              className={day === yesterdayIso() ? "chip-button active" : "chip-button"}
+              type="button"
+              onClick={() => onDayChange(yesterdayIso())}
+            >
+              Yesterday
+            </button>
+          </div>
+          <label className="trace-toolbar-field">
+            <input type="date" value={day} onChange={(event) => onDayChange(event.target.value)} />
+          </label>
+          <button className="trace-toolbar-chip" type="button" onClick={() => setRefreshToken((value) => value + 1)}>
+            Refresh
+          </button>
+          <span className="updated-text">
+            Updated {data?.generatedAt ? formatDateTime(data.generatedAt) : "--"}
+          </span>
+        </div>
+      </div>
+
+      {error ? <div className="banner error">{error}</div> : null}
+
+      <div className="kpi-grid">
+        <KpiCard label="Total Requests" value={formatNumber(data?.kpis.totalTraces)} icon="total" />
+        <KpiCard label="Success" value={formatNumber(totalSuccess)} icon="success" />
+        <KpiCard label="Failures" value={formatNumber(totalFailures)} tone="danger" icon="failure" />
+        <KpiCard label="Success Rate" value={`${successRate.toFixed(2)}%`} icon="rate" />
+        <KpiCard label="Unique Apps" value={formatNumber(data?.kpis.uniqueApps)} icon="apps" />
+        <KpiCard label="Unique APIs" value={formatNumber(data?.kpis.uniqueApis)} icon="apis" />
+      </div>
+
+      <div className="panel panel-breakdown">
+        <div className="panel-header panel-header-breakdown">
+          <div>
+            <h3>All App Breakdown</h3>
+          </div>
+          <button
+            className="link-action"
+            type="button"
+            onClick={() => exportCsv(rows, day)}
+            disabled={rows.length === 0}
+          >
+            Export
+          </button>
+        </div>
+
+        <div className="table-wrap">
+          <table className="breakdown-table">
+            <thead>
+              <tr>
+                <th>App</th>
+                <th>API</th>
+                <th>Total</th>
+                <th>Success</th>
+                <th>Failures</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty-cell">
+                    {loading ? "Loading dashboard..." : "No trace data found for this date."}
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row) => (
+                  <tr
+                    key={`${row.apiName}-${row.appName}`}
+                    className="clickable"
+                    onClick={() => onOpenLogs(row.appName, row.apiName)}
+                  >
+                    <td>
+                      <div className="event-name">{row.appName || "--"}</div>
+                    </td>
+                    <td>
+                      <div className="event-name">{row.apiName || "--"}</div>
+                    </td>
+                    <td className="mono">{formatNumber(row.traceCount)}</td>
+                    <td className="mono">{formatNumber(row.successCount)}</td>
+                    <td className="mono failure-text">{formatNumber(row.failureCount)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+====================================================================================================
+FILE: .\frontend\src\screens\TraceLogsScreen.tsx
+====================================================================================================
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { fetchJson } from "../api";
+import { PayloadPanel } from "../components/PayloadPanel";
+import type {
+  TraceDetailResponse,
+  TraceFiltersState,
+  TraceOverviewResponse,
+  TraceSearchResponse
+} from "../types";
+
+type TraceLogsScreenProps = {
+  day: string;
+  initialAppName: string;
+  initialApiName: string;
+  onBack: () => void;
+  onScopeChange: (appName: string, apiName: string) => void;
+  onDayChange: (day: string) => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
+  embedded?: boolean;
+};
+
+type HttpSeriesFilter = "200" | "400" | "500";
+type RowTone = "success" | "warning" | "failure";
+type QueryField = "correlation" | "channel" | "account" | "customer" | "latency";
+type QueryOperator = "=" | ">" | "<" | "all";
+type QueryClause = {
+  field: QueryField;
+  operator: QueryOperator;
+  value: string;
+};
+
+const QUERY_FIELD_OPTIONS: Array<{ value: QueryField; label: string }> = [
+  { value: "correlation", label: "Correlation ID" },
+  { value: "channel", label: "Channel ID" },
+  { value: "account", label: "Account" },
+  { value: "customer", label: "Customer" },
+  { value: "latency", label: "Latency" }
+];
+
+const LATENCY_OPERATOR_OPTIONS: Array<{ value: QueryOperator; label: string }> = [
+  { value: "all", label: "All" },
+  { value: ">", label: ">" },
+  { value: "<", label: "<" },
+  { value: "=", label: "=" }
+];
+
+const PAGE_SIZE = 50;
+const MAX_FILTER_CLAUSES = 3;
+
+function defaultOperator(field: QueryField): QueryOperator {
+  return field === "latency" ? "all" : "=";
+}
+
+function createQueryClause(field: QueryField = "correlation"): QueryClause {
+  return {
+    field,
+    operator: defaultOperator(field),
+    value: ""
+  };
+}
+
+function fieldPlaceholder(field: QueryField) {
+  if (field === "latency") {
+    return "0-1000 ms";
+  }
+  if (field === "correlation") {
+    return "Correlation ID";
+  }
+  if (field === "channel") {
+    return "Channel ID";
+  }
+  if (field === "account") {
+    return "Account";
+  }
+  return "Customer";
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayIso() {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function buildDefaultFilters(day: string, apiName: string, appName: string): TraceFiltersState {
+  return {
+    apiName,
+    appName,
+    correlationId: "",
+    channelId: "",
+    accountQuery: "",
+    customerQuery: "",
+    payloadQuery: "",
+    globalQuery: "",
+    minTotalLatencyMs: null,
+    maxTotalLatencyMs: null,
+    exactTotalLatencyMs: null,
+    from: `${day}T00:00`,
+    to: `${day}T23:59`
+  };
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) {
+    return "--";
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(new Date(value));
+}
+
+function formatDayLabel(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "2-digit",
+    year: "numeric"
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat().format(value);
+}
+
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: value >= 1_000_000 ? 1 : 0
+  }).format(value);
+}
+
+function formatLatency(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "--";
+  }
+  return `${Math.round(value)}ms`;
+}
+
+function formatLatencyValue(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "--";
+  }
+  return String(Math.round(value));
+}
+
+function clampLatency(value: number | null | undefined) {
+  return value === null || value === undefined ? 0 : Math.max(Math.round(value), 0);
+}
+
+function parsePayloadValue(value: string | null | undefined) {
+  if (!value || !value.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
+function displayAppName(value: string) {
+  return value.trim() ? value : "All Apps";
+}
+
+function displayApiName(value: string) {
+  return value.trim() ? value : "All APIs";
+}
+
+function formatApiRoute(value: string | null | undefined) {
+  if (!value || !value.trim()) {
+    return "--";
+  }
+  return `/${value
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/\s+/g, "-")
+    .toLowerCase()}`;
+}
+
+function normalizeLatencyFilter(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return Math.max(0, Math.min(1000, Math.round(parsed)));
+}
+
+function buildFilters(day: string, apiName: string, appName: string, clauses: QueryClause[]) {
+  const next = buildDefaultFilters(day, apiName, appName);
+
+  for (const clause of clauses) {
+    const value = clause.value.trim();
+
+    if (clause.field === "correlation") {
+      next.correlationId = value;
+      continue;
+    }
+    if (clause.field === "channel") {
+      next.channelId = value;
+      continue;
+    }
+    if (clause.field === "account") {
+      next.accountQuery = value;
+      continue;
+    }
+    if (clause.field === "customer") {
+      next.customerQuery = value;
+      continue;
+    }
+
+    const latencyValue = normalizeLatencyFilter(value);
+    if (clause.operator === "all" || latencyValue === null) {
+      continue;
+    }
+    if (clause.operator === ">") {
+      next.minTotalLatencyMs = latencyValue;
+    } else if (clause.operator === "<") {
+      next.maxTotalLatencyMs = latencyValue;
+    } else {
+      next.exactTotalLatencyMs = latencyValue;
+    }
+  }
+
+  return next;
+}
+
+function toQueryString(filters: TraceFiltersState, page: number, httpSeries: HttpSeriesFilter) {
+  const params = new URLSearchParams();
+  params.set("date", filters.from.slice(0, 10));
+  params.set("page", String(page));
+  params.set("size", String(PAGE_SIZE));
+  params.set("httpSeries", httpSeries);
+
+  if (filters.apiName.trim()) {
+    params.set("apiName", filters.apiName.trim());
+  }
+  if (filters.appName.trim()) {
+    params.set("appName", filters.appName.trim());
+  }
+  if (filters.correlationId.trim()) {
+    params.set("correlationId", filters.correlationId.trim());
+  }
+  if (filters.channelId.trim()) {
+    params.set("channelId", filters.channelId.trim());
+  }
+  if (filters.accountQuery.trim()) {
+    params.set("accountQuery", filters.accountQuery.trim());
+  }
+  if (filters.customerQuery.trim()) {
+    params.set("customerQuery", filters.customerQuery.trim());
+  }
+  if (filters.payloadQuery.trim()) {
+    params.set("payloadQuery", filters.payloadQuery.trim());
+  }
+  if (filters.globalQuery.trim()) {
+    params.set("globalQuery", filters.globalQuery.trim());
+  }
+  if (filters.minTotalLatencyMs !== null) {
+    params.set("minTotalLatencyMs", String(filters.minTotalLatencyMs));
+  }
+  if (filters.maxTotalLatencyMs !== null) {
+    params.set("maxTotalLatencyMs", String(filters.maxTotalLatencyMs));
+  }
+  if (filters.exactTotalLatencyMs !== null) {
+    params.set("exactTotalLatencyMs", String(filters.exactTotalLatencyMs));
+  }
+  if (filters.from) {
+    params.set("from", filters.from);
+  }
+  if (filters.to) {
+    params.set("to", filters.to);
+  }
+
+  return params.toString();
+}
+
+function getRowTone(httpSeries: string | null | undefined): RowTone {
+  const normalized = httpSeries?.trim();
+  if (normalized === "500") {
+    return "failure";
+  }
+  if (normalized === "400") {
+    return "warning";
+  }
+  return "success";
+}
+
+function getStatusLabel(httpSeries: string | null | undefined) {
+  if (httpSeries === "500") {
+    return "500 ERR";
+  }
+  if (httpSeries === "400") {
+    return "400 WARN";
+  }
+  return "200 OK";
+}
+
+export function TraceLogsScreen({
+  day,
+  initialAppName,
+  initialApiName,
+  onBack,
+  onScopeChange,
+  onDayChange,
+  theme,
+  onToggleTheme
+}: TraceLogsScreenProps) {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const scopeMenuRef = useRef<HTMLDivElement | null>(null);
+  const [errorType, setErrorType] = useState<HttpSeriesFilter>("200");
+  const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
+  const [scopeQuery, setScopeQuery] = useState("");
+  const [filterClauses, setFilterClauses] = useState<QueryClause[]>(() => [createQueryClause("correlation")]);
+  const [page, setPage] = useState(0);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [appliedFilters, setAppliedFilters] = useState<TraceFiltersState>(() =>
+    buildDefaultFilters(day, initialApiName, initialAppName)
+  );
+  const [overviewData, setOverviewData] = useState<TraceOverviewResponse | null>(null);
+  const [searchData, setSearchData] = useState<TraceSearchResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedTraceId, setSelectedTraceId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<TraceDetailResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAppliedFilters(buildDefaultFilters(day, initialApiName, initialAppName));
+    setFilterClauses([createQueryClause("correlation")]);
+    setErrorType("200");
+    setScopeMenuOpen(false);
+    setScopeQuery("");
+    setPage(0);
+  }, [day, initialApiName, initialAppName]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!scopeMenuRef.current?.contains(event.target as Node)) {
+        setScopeMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setScopeMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchJson<TraceOverviewResponse>(
+      `/api/v1/traces/overview?date=${day}&appName=${encodeURIComponent(initialAppName)}&apiName=${encodeURIComponent(initialApiName)}`,
+      controller.signal
+    )
+      .then(setOverviewData)
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setOverviewData(null);
+        }
+      });
+
+    return () => controller.abort();
+  }, [day, initialAppName, initialApiName, refreshToken]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    fetchJson<TraceSearchResponse>(
+      `/api/v1/traces?${toQueryString(appliedFilters, page, errorType)}&refreshToken=${refreshToken}`,
+      controller.signal
+    )
+      .then(setSearchData)
+      .catch((nextError) => {
+        if (!controller.signal.aborted) {
+          setError(nextError instanceof Error ? nextError.message : String(nextError));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [appliedFilters, errorType, page, refreshToken]);
+
+  useEffect(() => {
+    if (selectedTraceId === null) {
+      return;
+    }
+
+    const controller = new AbortController();
+    setDetailLoading(true);
+    setDetailError(null);
+
+    fetchJson<TraceDetailResponse>(`/api/v1/traces/${selectedTraceId}`, controller.signal)
+      .then(setDetail)
+      .catch((nextError) => {
+        if (!controller.signal.aborted) {
+          setDetailError(nextError instanceof Error ? nextError.message : String(nextError));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setDetailLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedTraceId]);
+
+  const totalPages = searchData?.totalPages ?? 0;
+  const canPrev = page > 0;
+  const canNext = page + 1 < totalPages;
+  const totalRequests = overviewData?.totalRequests ?? searchData?.totalRequests ?? 0;
+  const successCount = overviewData?.successCount ?? searchData?.successCount ?? 0;
+  const failureCount = overviewData?.failureCount ?? searchData?.failureCount ?? 0;
+  const successRate = totalRequests === 0 ? 0 : (successCount * 100) / totalRequests;
+  const scopeLabel = `${displayAppName(initialAppName)} / ${displayApiName(initialApiName)}`;
+  const filteredScopeOptions = useMemo(() => {
+    const normalizedQuery = scopeQuery.trim().toLowerCase();
+    const options = overviewData?.scopeOptions ?? [];
+    const allOption = { appName: "", apiName: "" };
+    const dedupedOptions = options.filter((option) => option.appName.trim() || option.apiName.trim());
+    const filteredOptions = normalizedQuery
+      ? dedupedOptions.filter((option) =>
+          `${option.appName} ${option.apiName} ${displayAppName(option.appName)} ${displayApiName(option.apiName)}`
+            .toLowerCase()
+            .includes(normalizedQuery)
+        )
+      : dedupedOptions;
+
+    if (!normalizedQuery || "all apps all apis".includes(normalizedQuery)) {
+      return [allOption, ...filteredOptions];
+    }
+
+    return filteredOptions;
+  }, [overviewData?.scopeOptions, scopeQuery]);
+  const warningCount = errorType === "400" ? searchData?.totalElements ?? 0 : 0;
+  const visibleRows = searchData?.rows ?? [];
+  const filterTotal = searchData?.totalElements ?? 0;
+  const isCustomDay = day !== todayIso() && day !== yesterdayIso();
+
+  function openDatePicker() {
+    const input = dateInputRef.current;
+    if (!input) {
+      return;
+    }
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+    input.focus();
+  }
+
+  function applyFilters() {
+    setAppliedFilters(buildFilters(day, initialApiName, initialAppName, filterClauses));
+    setPage(0);
+  }
+
+  function resetFilters() {
+    setFilterClauses([createQueryClause("correlation")]);
+    setErrorType("200");
+    setAppliedFilters(buildDefaultFilters(day, initialApiName, initialAppName));
+    setPage(0);
+  }
+
+  function updateClause(index: number, next: QueryClause) {
+    setFilterClauses((current) => current.map((clause, clauseIndex) => (clauseIndex === index ? next : clause)));
+  }
+
+  function nextAvailableField(currentClauses: QueryClause[]) {
+    const usedFields = new Set(currentClauses.map((clause) => clause.field));
+    return QUERY_FIELD_OPTIONS.find((option) => !usedFields.has(option.value))?.value ?? "correlation";
+  }
+
+  function addFilterClause() {
+    setFilterClauses((current) => {
+      if (current.length >= MAX_FILTER_CLAUSES) {
+        return current;
+      }
+      return [...current, createQueryClause(nextAvailableField(current))];
+    });
+  }
+
+  function removeFilterClause(index: number) {
+    setFilterClauses((current) => (current.length <= 1 ? current : current.filter((_, clauseIndex) => clauseIndex !== index)));
+  }
+
+  function downloadAllPayloads() {
+    if (!detail) {
+      return;
+    }
+
+    const payloadBundle = {
+      traceId: detail.id,
+      correlationId: detail.correlationId,
+      appName: detail.appName,
+      apiName: detail.apiName,
+      requestPayload: parsePayloadValue(detail.requestPayload),
+      corePayload: parsePayloadValue(detail.corePayload),
+      coreResponse: parsePayloadValue(detail.coreResponse),
+      channelResponse: parsePayloadValue(detail.channelResponse)
+    };
+
+    const blob = new Blob([JSON.stringify(payloadBundle, null, 2)], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `trace-${detail.id}-payloads.json`;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section className="screen-shell trace-explorer-screen" ref={sectionRef}>
+      <div className="trace-observability-shell">
+        <header className="trace-observability-header">
+          <div className="trace-observability-topbar">
+            <div className="trace-header-core">
+              <button className={`trace-header-badge ${theme === "light" ? "light" : "dark"}`} type="button" onDoubleClick={onToggleTheme}>
+                TD
+              </button>
+              <div className="trace-header-path">
+                <button className="trace-header-link" type="button" onClick={onBack}>
+                  Dashboard
+                </button>
+                <span>/</span>
+                <strong>{displayAppName(initialAppName)}</strong>
+                <span>/</span>
+                <strong>{displayApiName(initialApiName)}</strong>
+              </div>
+            </div>
+
+            <div className="trace-header-controls">
+              <span className="trace-header-control-label">Day:</span>
+              <div className="trace-header-day-toggle">
+                <button
+                  className={day === todayIso() ? "trace-header-day-button active" : "trace-header-day-button"}
+                  type="button"
+                  onClick={() => onDayChange(todayIso())}
+                >
+                  Today
+                </button>
+                <button
+                  className={day === yesterdayIso() ? "trace-header-day-button active" : "trace-header-day-button"}
+                  type="button"
+                  onClick={() => onDayChange(yesterdayIso())}
+                >
+                  Yesterday
+                </button>
+                <button
+                  className={isCustomDay ? "trace-header-day-button active" : "trace-header-day-button"}
+                  type="button"
+                  onClick={openDatePicker}
+                >
+                  Custom
+                </button>
+              </div>
+
+              <div className="trace-header-date-field">
+                <button className="trace-header-chip" type="button" onClick={openDatePicker}>
+                  {day.split("-").reverse().join("/")}
+                </button>
+                <label className="trace-toolbar-date-input">
+                  <input ref={dateInputRef} type="date" value={day} onChange={(event) => onDayChange(event.target.value)} />
+                </label>
+              </div>
+              <div className="scope-field trace-header-scope-field" ref={scopeMenuRef}>
+                <button
+                  className="trace-header-chip trace-header-scope-chip scope-select-button"
+                  type="button"
+                  onClick={() => setScopeMenuOpen((value) => !value)}
+                >
+                  <span>{scopeLabel}</span>
+                  <span className="scope-select-arrow" aria-hidden="true" />
+                </button>
+                {scopeMenuOpen ? (
+                  <div className="scope-select-menu trace-scope-select-menu">
+                    <div className="scope-search trace-scope-search">
+                      <input
+                        autoFocus
+                        value={scopeQuery}
+                        onChange={(event) => setScopeQuery(event.target.value)}
+                        placeholder="Search app or API"
+                      />
+                    </div>
+                    {filteredScopeOptions.length === 0 ? (
+                      <div className="scope-empty">No app/API matches.</div>
+                    ) : (
+                      filteredScopeOptions.map((option) => {
+                        const optionLabel = `${displayAppName(option.appName)} / ${displayApiName(option.apiName)}`;
+                        const isActive = option.appName === initialAppName && option.apiName === initialApiName;
+                        return (
+                          <button
+                            key={`${option.appName}-${option.apiName}`}
+                            className={isActive ? "scope-option active" : "scope-option"}
+                            type="button"
+                            onClick={() => {
+                              onScopeChange(option.appName, option.apiName);
+                              setScopeMenuOpen(false);
+                              setScopeQuery("");
+                            }}
+                          >
+                            {optionLabel}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : null}
+              </div>
+              <button className="trace-header-chip trace-header-refresh" type="button" onClick={() => setRefreshToken((value) => value + 1)}>
+                Refresh
+              </button>
+              <button
+                className={`trace-theme-switch ${theme === "light" ? "light" : "dark"}`}
+                type="button"
+                onClick={onToggleTheme}
+                aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              >
+                <span className="trace-theme-switch-track">
+                  <span className="trace-theme-switch-thumb" />
+                </span>
+                <span className="trace-theme-switch-cord" />
+              </button>
+              <span className="trace-header-updated">
+                Updated {searchData?.generatedAt ? formatDateTime(searchData.generatedAt) : "--"}
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <div className="trace-observability-kpis">
+          <article className="trace-observability-kpi accent">
+            <span>Total Requests</span>
+            <div className="trace-observability-kpi-value-row">
+              <strong>{formatCompactNumber(totalRequests)}</strong>
+              <small>{warningCount > 0 ? `${((warningCount / Math.max(totalRequests, 1)) * 100).toFixed(1)}%` : "0.0%"}</small>
+            </div>
+          </article>
+          <article className="trace-observability-kpi">
+            <span>Success</span>
+            <div className="trace-observability-kpi-value-row">
+              <strong>{formatCompactNumber(successCount)}</strong>
+            </div>
+          </article>
+          <article className="trace-observability-kpi danger">
+            <span>Failures</span>
+            <div className="trace-observability-kpi-value-row">
+              <strong>{formatCompactNumber(failureCount)}</strong>
+              <small>{failureCount > 0 ? `${((failureCount / Math.max(totalRequests, 1)) * 100).toFixed(1)}%` : "0.0%"}</small>
+            </div>
+          </article>
+          <article className="trace-observability-kpi success">
+            <span>Success Rate</span>
+            <div className="trace-observability-kpi-value-row">
+              <strong>{successRate.toFixed(2)}%</strong>
+            </div>
+          </article>
+          <article className="trace-observability-kpi">
+            <span>Recv Latency</span>
+            <div className="trace-observability-kpi-value-row">
+              <strong>{formatLatency(overviewData?.averageReceivedLatencyMs ?? searchData?.averageReceivedLatencyMs)}</strong>
+            </div>
+          </article>
+          <article className="trace-observability-kpi">
+            <span>Ext Latency</span>
+            <div className="trace-observability-kpi-value-row">
+              <strong>{formatLatency(overviewData?.averageExternalLatencyMs ?? searchData?.averageExternalLatencyMs)}</strong>
+            </div>
+          </article>
+          <article className="trace-observability-kpi">
+            <span>Latency</span>
+            <div className="trace-observability-kpi-value-row">
+              <strong>{formatLatency(overviewData?.averageTotalLatencyMs ?? searchData?.averageTotalLatencyMs)}</strong>
+            </div>
+          </article>
+        </div>
+
+        <div className="trace-observability-filterbar">
+          <div className="trace-filter-block trace-filter-status-block">
+            <span>Status</span>
+            <div className="trace-status-toggle">
+              <button
+                className={errorType === "200" ? "trace-status-button active success" : "trace-status-button"}
+                type="button"
+                onClick={() => {
+                  setErrorType("200");
+                  setPage(0);
+                }}
+              >
+                200
+              </button>
+              <button
+                className={errorType === "400" ? "trace-status-button active warning" : "trace-status-button"}
+                type="button"
+                onClick={() => {
+                  setErrorType("400");
+                  setPage(0);
+                }}
+              >
+                400
+              </button>
+              <button
+                className={errorType === "500" ? "trace-status-button active danger" : "trace-status-button"}
+                type="button"
+                onClick={() => {
+                  setErrorType("500");
+                  setPage(0);
+                }}
+              >
+                500
+              </button>
+            </div>
+          </div>
+
+          <div className="trace-filter-builder-block">
+            <span>Filters</span>
+            <div className="trace-filter-builder">
+              {filterClauses.map((clause, index) => {
+                const availableFields = QUERY_FIELD_OPTIONS.filter((option) =>
+                  option.value === clause.field ||
+                  !filterClauses.some((otherClause, otherIndex) => otherIndex !== index && otherClause.field === option.value)
+                );
+                const isLatency = clause.field === "latency";
+                return (
+                  <div key={`${clause.field}-${index}`} className="trace-query-item">
+                    {index > 0 ? <span className="trace-query-join">AND</span> : null}
+                    <div className="trace-query-clause">
+                      <select
+                        className="trace-query-select trace-query-field"
+                        value={clause.field}
+                        onChange={(event) => {
+                          const nextField = event.target.value as QueryField;
+                          updateClause(index, {
+                            field: nextField,
+                            operator: defaultOperator(nextField),
+                            value: nextField === "latency" ? clause.value : ""
+                          });
+                        }}
+                      >
+                        {availableFields.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        className="trace-query-select trace-query-operator"
+                        value={clause.operator}
+                        onChange={(event) =>
+                          updateClause(index, {
+                            ...clause,
+                            operator: event.target.value as QueryOperator,
+                            value: event.target.value === "all" ? "" : clause.value
+                          })
+                        }
+                        disabled={!isLatency}
+                      >
+                        {(isLatency ? LATENCY_OPERATOR_OPTIONS : [{ value: "=", label: "=" }]).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        className="trace-query-input"
+                        type={isLatency ? "number" : "text"}
+                        min={isLatency ? 0 : undefined}
+                        max={isLatency ? 1000 : undefined}
+                        step={isLatency ? 25 : undefined}
+                        value={clause.value}
+                        onChange={(event) => updateClause(index, { ...clause, value: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            applyFilters();
+                          }
+                        }}
+                        placeholder={fieldPlaceholder(clause.field)}
+                        disabled={isLatency && clause.operator === "all"}
+                      />
+
+                      {filterClauses.length > 1 ? (
+                        <button className="trace-query-remove" type="button" onClick={() => removeFilterClause(index)} aria-label="Remove filter">
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <button
+                className="trace-add-filter-button"
+                type="button"
+                onClick={addFilterClause}
+                disabled={filterClauses.length >= MAX_FILTER_CLAUSES}
+              >
+                + Add filter
+              </button>
+            </div>
+          </div>
+
+          <div className="trace-inline-actions">
+            <button className="trace-apply-button" type="button" onClick={applyFilters}>
+              Apply
+            </button>
+          </div>
+        </div>
+
+        {error ? <div className="banner error">{error}</div> : null}
+
+        <div className="trace-observability-table panel">
+          <div className="table-wrap trace-table-wrap">
+            <table className="trace-results-table trace-results-table-compact">
+              <thead>
+                <tr>
+                  <th>App Name</th>
+                  <th>URL</th>
+                  <th>Trace ID</th>
+                  <th>Channel ID</th>
+                  <th>Timestamp</th>
+                  <th>Latency Breakdown</th>
+                  <th className="table-center">HTTP Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="empty-cell">
+                      {loading ? "Loading traces..." : "No traces match the current filters."}
+                    </td>
+                  </tr>
+                ) : (
+                  visibleRows.map((row) => {
+                    const tone = getRowTone(row.httpSeries);
+                    const entryLatency = clampLatency(row.requestReceivedLatencyMs);
+                    const totalLatency = clampLatency(row.totalLatencyMs);
+                    const coreLatency = Math.max(totalLatency - entryLatency, 0);
+                    const safeTotal = Math.max(totalLatency, 1);
+                    const entryWidth = tone === "failure" ? 88 : Math.min((entryLatency / safeTotal) * 100, 100);
+                    const coreWidth = tone === "failure" ? 12 : Math.min((coreLatency / safeTotal) * 100, 100 - entryWidth);
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`clickable trace-row trace-row-compact ${tone}`}
+                        onClick={() => {
+                          setScopeMenuOpen(false);
+                          setSelectedTraceId(row.id);
+                          setDetail(null);
+                        }}
+                      >
+                        <td className="trace-app-cell">{row.appName || "--"}</td>
+                        <td>
+                          <div className="trace-api-cell">
+                            <span>{formatApiRoute(row.apiName)}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <button
+                            className="trace-id-link"
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setScopeMenuOpen(false);
+                              setSelectedTraceId(row.id);
+                              setDetail(null);
+                            }}
+                          >
+                            {row.correlationId || `tr-${row.id}`}
+                          </button>
+                        </td>
+                        <td className="mono trace-channel-cell">{row.channelId || "--"}</td>
+                        <td className="mono trace-timestamp-cell">{formatDateTime(row.requestTimestamp)}</td>
+                        <td>
+                          <div className={`trace-latency-breakdown ${tone}`}>
+                            <div className="trace-latency-bar">
+                              <span className="trace-latency-segment entry" style={{ width: `${entryWidth}%` }} />
+                              <span className="trace-latency-segment core" style={{ width: `${coreWidth}%` }} />
+                            </div>
+                            <div className="trace-latency-values">
+                              <span>{formatLatencyValue(row.requestReceivedLatencyMs)}ms</span>
+                              <span>/</span>
+                              <span>{formatLatencyValue(coreLatency)}ms</span>
+                              <span>/</span>
+                              <strong>{formatLatencyValue(row.totalLatencyMs)}ms</strong>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-center">
+                          <span className={`status-badge ${tone}`}>{getStatusLabel(row.httpSeries)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="trace-observability-footer">
+            <span>
+              {loading
+                ? "Refreshing trace feed..."
+                : `Showing ${visibleRows.length} traces on this page | ${formatNumber(filterTotal)} in active filter`}
+            </span>
+            <div className="trace-footer-pager">
+              <button className="trace-page-button" type="button" onClick={() => setPage(0)} disabled={!canPrev}>
+                First
+              </button>
+              <button className="trace-page-button" type="button" onClick={() => setPage((value) => value - 1)} disabled={!canPrev}>
+                Prev
+              </button>
+              <span className="trace-page-indicator">
+                {Math.min((searchData?.page ?? 0) + 1, Math.max(totalPages, 1))}
+              </span>
+              <button className="trace-page-button" type="button" onClick={() => setPage((value) => value + 1)} disabled={!canNext}>
+                Next
+              </button>
+              <button className="trace-page-button" type="button" onClick={() => setPage(Math.max(totalPages - 1, 0))} disabled={!canNext}>
+                Last
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {selectedTraceId !== null ? (
+        <div className="drawer-shell" role="dialog" aria-modal="true">
+          <div className="drawer-backdrop" onClick={() => setSelectedTraceId(null)} />
+          <aside className="drawer-card">
+            <div className="drawer-header">
+              <div className="drawer-title-block">
+                <p className="eyebrow">End-to-end trace</p>
+                <h3>Record #{selectedTraceId}</h3>
+                <p className="drawer-subtitle">{`${detail?.appName || "--"} / ${detail?.apiName || "--"}`}</p>
+              </div>
+              <button className="icon-close" type="button" onClick={() => setSelectedTraceId(null)}>
+                Close
+              </button>
+            </div>
+
+            {detailError ? <div className="banner error">{detailError}</div> : null}
+
+            {detailLoading || !detail ? (
+              <div className="detail-loading">{detailLoading ? "Loading trace detail..." : "No trace selected."}</div>
+            ) : (
+              <>
+                <div className="drawer-section">
+                  <div className="drawer-section-head">
+                    <p className="eyebrow">Summary</p>
+                  </div>
+
+                  <div className="detail-grid">
+                    <div className="detail-card">
+                      <span>Status</span>
+                      <strong>{detail.status || "--"}</strong>
+                    </div>
+                    <div className="detail-card">
+                      <span>API name</span>
+                      <strong>{detail.apiName || "--"}</strong>
+                    </div>
+                    <div className="detail-card">
+                      <span>App name</span>
+                      <strong>{detail.appName || "--"}</strong>
+                    </div>
+                    <div className="detail-card">
+                      <span>Correlation ID</span>
+                      <strong className="mono">{detail.correlationId || "--"}</strong>
+                    </div>
+                    <div className="detail-card">
+                      <span>Channel ID</span>
+                      <strong className="mono">{detail.channelId || "--"}</strong>
+                    </div>
+                    <div className="detail-card">
+                      <span>Request timestamp</span>
+                      <strong className="mono">{formatDateTime(detail.requestTimestamp)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="drawer-section">
+                  <div className="drawer-section-head">
+                    <p className="eyebrow">Latency</p>
+                  </div>
+                  <div className="trace-stage-strip">
+                    <div className="trace-stage-card">
+                      <span>Request received latency</span>
+                      <strong>{formatLatency(detail.requestReceivedLatencyMs)}</strong>
+                    </div>
+                    <div className="trace-stage-card">
+                      <span>External latency</span>
+                      <strong>{formatLatency(detail.externalLatencyMs)}</strong>
+                    </div>
+                    <div className="trace-stage-card">
+                      <span>Total latency</span>
+                      <strong>{formatLatency(detail.totalLatencyMs)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="drawer-section">
+                  <div className="drawer-section-head">
+                    <h3 className="payload-section-title">Transaction Payloads</h3>
+                    <button className="payload-download-button" type="button" onClick={downloadAllPayloads}>
+                      Download All
+                    </button>
+                  </div>
+                  <div className="payload-grid e2e">
+                    <PayloadPanel eyebrow="Payload 01" title="Entry Request" value={detail.requestPayload} className="payload-tone-cyan" />
+                    <PayloadPanel eyebrow="Payload 02" title="Core Payload" value={detail.corePayload} className="payload-tone-blue" />
+                    <PayloadPanel eyebrow="Payload 03" title="Core Response" value={detail.coreResponse} className="payload-tone-slate" />
+                    <PayloadPanel eyebrow="Payload 04" title="Response Egress" value={detail.channelResponse} className="payload-tone-teal" />
+                  </div>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+
+====================================================================================================
+FILE: .\frontend\src\styles\app.css
+====================================================================================================
+
+:root {
+  --bg: #07111f;
+  --bg-top: #0c1831;
+  --panel: rgba(13, 24, 42, 0.92);
+  --panel-alt: rgba(18, 31, 53, 0.96);
+  --panel-card: linear-gradient(180deg, rgba(14, 24, 41, 0.96), rgba(10, 18, 30, 0.94));
+  --toolbar: linear-gradient(135deg, rgba(20, 35, 58, 0.94), rgba(9, 17, 30, 0.96));
+  --text: #eaf1ff;
+  --muted: #8da4c6;
+  --muted-strong: #b6c6df;
+  --border: rgba(138, 167, 201, 0.14);
+  --border-strong: rgba(125, 164, 210, 0.28);
+  --accent: #6ce6ff;
+  --accent-strong: #23cfe8;
+  --accent-soft: rgba(108, 230, 255, 0.14);
+  --success: #6ff0a7;
+  --success-soft: rgba(111, 240, 167, 0.14);
+  --danger: #ff8f8f;
+  --danger-strong: #ff6262;
+  --danger-soft: rgba(255, 98, 98, 0.14);
+  --warning: #ffcb6b;
+  --input-bg: rgba(6, 13, 25, 0.68);
+  --input-border: rgba(138, 167, 201, 0.16);
+  --pill-bg: rgba(255, 255, 255, 0.03);
+  --chip-bg: rgba(255, 255, 255, 0.04);
+  --chip-hover: rgba(255, 255, 255, 0.08);
+  --table-head: rgba(7, 16, 28, 0.55);
+  --row-hover: rgba(255, 255, 255, 0.04);
+  --row-failure: rgba(255, 98, 98, 0.035);
+  --shadow: 0 20px 50px rgba(3, 9, 20, 0.28);
+  --shadow-soft: 0 10px 32px rgba(3, 9, 20, 0.18);
+  --overlay: rgba(4, 8, 15, 0.72);
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Inter", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  color-scheme: inherit;
+}
+
+#root,
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-shell {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(84, 186, 255, 0.14), transparent 22%),
+    radial-gradient(circle at 100% 0%, rgba(255, 98, 98, 0.08), transparent 18%),
+    linear-gradient(180deg, var(--bg-top), var(--bg));
+  color: var(--text);
+}
+
+.app-shell.theme-dark,
+html.theme-dark,
+body.theme-dark {
+  color-scheme: dark;
+}
+
+.app-shell.theme-light,
+html.theme-light,
+body.theme-light {
+  color-scheme: light;
+  --bg: #f7f9fb;
+  --bg-top: #fcfdff;
+  --panel: rgba(255, 255, 255, 0.98);
+  --panel-alt: rgba(242, 244, 246, 0.98);
+  --panel-card: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(251, 252, 253, 1));
+  --toolbar: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 249, 251, 0.96));
+  --text: #191c1e;
+  --muted: #6c797d;
+  --muted-strong: #3c494c;
+  --border: rgba(187, 201, 205, 0.9);
+  --border-strong: rgba(108, 121, 125, 0.18);
+  --accent: #006879;
+  --accent-strong: #00b8d4;
+  --accent-soft: rgba(0, 104, 121, 0.08);
+  --success: #087f5b;
+  --success-soft: #e7f8ef;
+  --danger: #ba1a1a;
+  --danger-strong: #93000a;
+  --danger-soft: #ffebe8;
+  --warning: #b26a00;
+  --input-bg: #f2f4f6;
+  --input-border: rgba(187, 201, 205, 0.95);
+  --pill-bg: #eef3f6;
+  --chip-bg: #ffffff;
+  --chip-hover: #edf2f4;
+  --table-head: #f2f4f6;
+  --row-hover: #f7fafb;
+  --row-failure: rgba(255, 218, 214, 0.42);
+  --shadow: 0 20px 40px rgba(25, 28, 30, 0.04), 0 10px 10px rgba(25, 28, 30, 0.02);
+  --shadow-soft: 0 12px 28px rgba(25, 28, 30, 0.04);
+  --overlay: rgba(25, 28, 30, 0.18);
+  background:
+    radial-gradient(circle at top left, rgba(73, 215, 244, 0.14), transparent 24%),
+    radial-gradient(circle at top right, rgba(0, 184, 212, 0.08), transparent 18%),
+    linear-gradient(180deg, #fcfdff, #f7f9fb 40%, #f1f4f7);
+}
+
+.main-shell {
+  max-width: 1720px;
+  margin: 0 auto;
+  padding: 20px 20px 28px;
+}
+
+.detail-mode {
+  padding-top: 20px;
+}
+
+.screen-shell,
+.single-page-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, rgba(108, 230, 255, 0.2), rgba(108, 230, 255, 0.04)),
+    linear-gradient(145deg, #152640, #091427);
+  border: 1px solid rgba(108, 230, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(5, 11, 25, 0.18);
+  color: var(--accent);
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.app-shell.theme-light .brand-mark {
+  background:
+    linear-gradient(145deg, rgba(0, 184, 212, 0.14), rgba(73, 215, 244, 0.04)),
+    linear-gradient(145deg, #ffffff, #eef4f7);
+  border-color: rgba(73, 215, 244, 0.22);
+  color: var(--accent);
+}
+
+.panel,
+.drawer-card {
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.panel {
+  overflow: hidden;
+}
+
+.panel-header,
+.panel-header-breakdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.08rem;
+  color: var(--text);
+}
+
+.table-wrap {
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 1220px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 15px 18px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(140, 164, 192, 0.08);
+}
+
+th {
+  background: var(--table-head);
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.trace-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: var(--toolbar);
+  box-shadow: var(--shadow);
+}
+
+.trace-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.trace-header-shell {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.trace-brand-copy {
+  display: grid;
+}
+
+.trace-brand-copy strong {
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.brand-mark-bolt {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.trace-toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.trace-toolbar-title strong {
+  margin: 4px 0 0;
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.52rem;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+.trace-toolbar-title-stack {
+  display: grid;
+  align-items: start;
+  gap: 4px;
+}
+
+.trace-toolbar-summary {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.trace-breadcrumb {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-strong);
+  font-weight: 700;
+}
+
+.trace-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.trace-breadcrumb-sep {
+  color: color-mix(in srgb, var(--muted) 64%, transparent);
+}
+
+.trace-breadcrumb-active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.trace-hero-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trace-hero-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.trace-hero-copy h1 {
+  margin: 0;
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.trace-hero-eyebrow {
+  margin: 0;
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.trace-hero-inline {
+  color: var(--accent);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+}
+
+.trace-hero-microstats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.trace-hero-stat {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  border: 1px solid var(--border);
+  color: var(--muted-strong);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.trace-command-search {
+  display: grid;
+  gap: 8px;
+  min-width: min(420px, 100%);
+}
+
+.trace-command-search span {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.trace-command-search input,
+.trace-toolbar-field input,
+.field input,
+.field select,
+.scope-select-button {
+  min-height: 42px;
+  border-radius: 14px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 0 14px;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.trace-command-search input::placeholder,
+.field input::placeholder {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+}
+
+.trace-command-search input:focus,
+.trace-toolbar-field input:focus,
+.field input:focus,
+.field select:focus,
+.scope-select-button:focus,
+.scope-search input:focus {
+  border-color: color-mix(in srgb, var(--accent) 40%, white);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.trace-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.day-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--pill-bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.header-toggle {
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.day-toggle span {
+  padding-left: 8px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+}
+
+.chip-button,
+.trace-toolbar-chip,
+.primary-button,
+.secondary-button,
+.icon-close,
+.link-action,
+.row-action {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  min-height: 38px;
+  padding: 0 12px;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.chip-button,
+.trace-toolbar-chip,
+.secondary-button,
+.icon-close,
+.link-action,
+.row-action {
+  background: var(--chip-bg);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.chip-button:hover,
+.trace-toolbar-chip:hover,
+.secondary-button:hover,
+.icon-close:hover,
+.link-action:hover,
+.row-action:hover {
+  transform: translateY(-1px);
+  background: var(--chip-hover);
+  border-color: var(--border-strong);
+}
+
+.chip-button.active,
+.primary-button,
+.danger-button {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.app-shell.theme-dark .chip-button.active,
+.app-shell.theme-dark .primary-button,
+.app-shell.theme-dark .danger-button {
+  color: #02111d;
+}
+
+.row-action.danger {
+  background: linear-gradient(135deg, #ff8a7a, #ff6b6b);
+  border-color: transparent;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.trace-toolbar-chip {
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.trace-refresh-button {
+  min-width: 96px;
+}
+
+.header-chip,
+.scope-select-button-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.scope-select-button-header {
+  min-width: 170px;
+  justify-content: space-between;
+}
+
+.trace-toolbar-date-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.trace-toolbar-date-input input {
+  width: 100%;
+  height: 100%;
+}
+
+.theme-toggle {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.theme-toggle-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  border: 1px solid var(--border);
+}
+
+.theme-toggle-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.theme-toggle-option.active {
+  background: var(--chip-bg);
+  color: var(--text);
+  box-shadow: var(--shadow-soft);
+}
+
+.updated-text {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.trace-header-kpi-grid {
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--border) 68%, transparent);
+}
+
+.kpi-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-height: 108px;
+  padding: 14px 16px;
+  border-radius: 0;
+  overflow: hidden;
+  border: 0;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: none;
+  --icon-color: var(--accent);
+}
+
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: auto 16px 0 16px;
+  width: auto;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.kpi-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kpi-card span {
+  font-size: 0.62rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.kpi-card strong {
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.18rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.kpi-card small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kpi-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.kpi-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.kpi-card-total::after,
+.kpi-card-rate::after {
+  content: "";
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.kpi-card-total::after {
+  width: 72%;
+}
+
+.kpi-card-rate::after {
+  width: 87%;
+}
+
+.kpi-card-success small {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.kpi-card-failure small {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.kpi-card-received strong,
+.kpi-card-external strong,
+.kpi-card-latency strong {
+  font-size: 1.68rem;
+}
+
+.kpi-card.danger {
+  --icon-color: var(--danger);
+}
+
+.kpi-card.danger::before {
+  background: linear-gradient(180deg, var(--danger), transparent);
+}
+
+.kpi-card.danger .kpi-icon {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.kpi-card.danger strong {
+  color: var(--danger);
+}
+
+.trace-workspace {
+  padding: 0;
+}
+
+.trace-workspace-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 0;
+}
+
+.trace-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.trace-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--pill-bg);
+  color: var(--muted-strong);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.trace-tab.active {
+  background: var(--chip-bg);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.trace-tab-count {
+  display: inline-flex;
+  min-width: 28px;
+  justify-content: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.7rem;
+}
+
+.trace-tab-count.failure {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.trace-filter-bar {
+  display: grid;
+  gap: 14px;
+  padding: 14px 18px 16px;
+}
+
+.trace-filter-bar-rich {
+  grid-template-columns: 0.9fr 1.3fr 1fr 1fr auto;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field span {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.trace-filter-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.scope-field {
+  position: relative;
+}
+
+.scope-select-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+
+.scope-select-button span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-select-arrow {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg) translateY(-1px);
+  transform-origin: center;
+}
+
+.scope-select-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  width: min(420px, 100%);
+  max-height: 360px;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.scope-search {
+  position: sticky;
+  top: 0;
+  padding-bottom: 10px;
+  background: var(--panel);
+}
+
+.scope-search input {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 16px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 0 14px;
+}
+
+.scope-option {
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--muted-strong);
+  text-align: left;
+}
+
+.scope-option:hover,
+.scope-option.active {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.scope-empty {
+  padding: 14px;
+  color: var(--muted);
+}
+
+.banner {
+  margin: 0 22px 18px;
+  padding: 14px 16px;
+  border-radius: 18px;
+}
+
+.banner.error {
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, transparent);
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+}
+
+.trace-table-wrap {
+  position: relative;
+}
+
+.trace-results-table {
+  min-width: 1380px;
+}
+
+.trace-results-table thead th:first-child,
+.trace-results-table tbody td:first-child {
+  padding-left: 22px;
+}
+
+.trace-results-table td:last-child,
+.trace-results-table th:last-child {
+  text-align: right;
+  padding-right: 22px;
+}
+
+.trace-row {
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.trace-row:hover {
+  background: var(--row-hover);
+}
+
+.trace-row.failure {
+  background: var(--row-failure);
+}
+
+.trace-row.slow {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 56%, transparent);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 98px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.status-badge.success {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 20%, transparent);
+  background: var(--success-soft);
+}
+
+.status-badge.warning {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 24%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+
+.status-badge.failure {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 20%, transparent);
+  background: var(--danger-soft);
+}
+
+.status-badge.neutral {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 24%, transparent);
+  background: color-mix(in srgb, var(--warning) 12%, white);
+}
+
+.mono,
+.timestamp-stack span,
+.timestamp-stack strong,
+.event-meta,
+.payload-panel pre {
+  font-family: "Cascadia Mono", "Consolas", "IBM Plex Mono", monospace;
+}
+
+.table-primary-cell {
+  color: color-mix(in srgb, var(--accent) 80%, var(--text));
+}
+
+.latency-hot {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+.timestamp-stack {
+  display: grid;
+  gap: 2px;
+}
+
+.timestamp-stack strong {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.timestamp-stack span {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.table-actions-head {
+  text-align: right;
+}
+
+.row-action {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.trace-footer,
+.pager,
+.pager-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trace-footer {
+  justify-content: space-between;
+  padding: 18px 22px 22px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.empty-cell {
+  padding: 42px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.event-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.failure-text {
+  color: var(--danger);
+}
+
+.preview-cell {
+  color: var(--muted-strong);
+}
+
+.link-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  font-weight: 700;
+}
+
+.drawer-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+
+.drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(10px);
+}
+
+.drawer-card {
+  position: relative;
+  width: min(1420px, calc(100vw - 44px));
+  height: min(920px, calc(100vh - 44px));
+  max-height: calc(100vh - 44px);
+  padding: 24px;
+  overflow: auto;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.drawer-title-block h3 {
+  margin: 10px 0 4px;
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--text);
+}
+
+.drawer-subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.detail-loading {
+  padding: 28px 0;
+  color: var(--muted);
+}
+
+.drawer-section {
+  display: grid;
+  gap: 14px;
+}
+
+.drawer-section + .drawer-section {
+  margin-top: 18px;
+}
+
+.drawer-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detail-grid,
+.payload-grid,
+.trace-stage-strip {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detail-card,
+.trace-stage-card,
+.payload-panel {
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: var(--chip-bg);
+}
+
+.detail-card,
+.trace-stage-card {
+  padding: 18px;
+}
+
+.detail-card span,
+.trace-stage-card span {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.detail-card strong,
+.trace-stage-card strong {
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.05rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.trace-stage-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payload-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.payload-grid.e2e {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding: 0;
+  overflow: visible;
+}
+
+.payload-header {
+  display: grid;
+  gap: 4px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.payload-header p {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.payload-header h4 {
+  margin: 0;
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.payload-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.payload-grid.e2e .payload-panel {
+  min-width: 0;
+  box-shadow:
+    0 16px 28px rgba(6, 14, 32, 0.14),
+    0 4px 10px rgba(6, 14, 32, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%),
+    var(--chip-bg);
+}
+
+.payload-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  border-radius: 22px 0 0 22px;
+  background: var(--accent);
+}
+
+.payload-tone-cyan::before {
+  background: #0fb4d9;
+}
+
+.payload-tone-blue::before {
+  background: #1da1d2;
+}
+
+.payload-tone-slate::before {
+  background: #436f7c;
+}
+
+.payload-tone-teal::before {
+  background: #0a7b88;
+}
+
+.payload-panel pre {
+  margin: 0;
+  min-height: 320px;
+  max-height: 520px;
+  overflow: auto;
+  padding: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.84rem;
+  line-height: 1.58;
+  color: color-mix(in srgb, var(--text) 82%, var(--muted));
+  background: color-mix(in srgb, var(--panel) 72%, var(--chip-bg));
+}
+
+.payload-section-title {
+  margin: 0;
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.12rem;
+  color: var(--text);
+}
+
+.payload-download-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.payload-download-button:hover {
+  text-decoration: underline;
+}
+
+.app-shell.theme-light .payload-panel {
+  background: #f7f8fb;
+  border-color: rgba(195, 212, 224, 0.72);
+}
+
+.app-shell.theme-light .payload-panel pre {
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.app-shell.theme-light .payload-grid.e2e .payload-panel {
+  box-shadow:
+    0 14px 24px rgba(120, 98, 40, 0.07),
+    0 3px 8px rgba(120, 98, 40, 0.04);
+}
+
+.app-shell.theme-light .payload-download-button {
+  color: #0b7f9a;
+}
+
+.trace-observability-shell {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trace-observability-header {
+  overflow: visible;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--panel-alt) 92%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+.trace-observability-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--panel-alt) 88%, #111827 12%);
+  overflow: visible;
+}
+
+.trace-header-core,
+.trace-header-path,
+.trace-header-controls,
+.trace-header-day-toggle,
+.trace-status-toggle,
+.trace-inline-actions,
+.trace-footer-pager {
+  display: flex;
+  align-items: center;
+}
+
+.trace-header-core {
+  gap: 12px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.trace-header-badge {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--border));
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--text);
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.trace-header-path {
+  gap: 8px;
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trace-header-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.trace-header-controls {
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+  overflow: visible;
+}
+
+.trace-header-control-label {
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.trace-header-day-toggle {
+  gap: 6px;
+}
+
+.trace-header-day-button,
+.trace-header-chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--chip-bg) 96%, transparent);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.trace-header-day-button.active {
+  background: color-mix(in srgb, var(--danger-soft) 26%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 65%, transparent);
+}
+
+.trace-header-chip {
+  min-width: 110px;
+  justify-content: space-between;
+}
+
+.trace-header-date-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.trace-header-scope-field {
+  position: relative;
+  flex: 0 1 260px;
+  min-width: 0;
+  z-index: 50;
+}
+
+.trace-header-scope-chip {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.trace-header-refresh {
+  min-width: 88px;
+}
+
+.trace-header-updated {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trace-theme-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 52px;
+  min-width: 52px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.trace-theme-switch-track {
+  position: relative;
+  display: inline-flex;
+  width: 44px;
+  height: 24px;
+  align-items: center;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(108, 230, 255, 0.12);
+  border: 1px solid rgba(138, 167, 201, 0.16);
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.trace-theme-switch-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(210, 213, 237, 0.72);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  transform: translateX(0);
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.trace-theme-switch-cord {
+  position: absolute;
+  top: calc(50% + 10px);
+  left: 50%;
+  width: 1px;
+  height: 12px;
+  background: rgba(109, 79, 255, 0.42);
+  transform: translateX(-50%);
+}
+
+.trace-theme-switch-cord::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 6px;
+  height: 8px;
+  border-radius: 2px;
+  background: #4b33d1;
+  transform: translateX(-50%);
+}
+
+.trace-theme-switch.light .trace-theme-switch-track {
+  background: rgba(108, 230, 255, 0.16);
+  border-color: rgba(108, 230, 255, 0.18);
+}
+
+.trace-theme-switch.light .trace-theme-switch-thumb {
+  background: #fffef8;
+  transform: translateX(24px);
+  box-shadow:
+    0 0 0 3px rgba(108, 230, 255, 0.12),
+    0 0 22px rgba(108, 230, 255, 0.42);
+}
+
+.trace-observability-kpis {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.trace-observability-kpi {
+  display: grid;
+  gap: 8px;
+  min-height: 78px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 0;
+  background: #2a3144;
+  box-shadow: none;
+  min-width: 0;
+}
+
+.trace-observability-kpi span {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9dacbf;
+}
+
+.trace-observability-kpi-value-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.trace-observability-kpi strong {
+  font-family: "Segoe UI Variable Display", "Bahnschrift", "Trebuchet MS", "Space Grotesk", sans-serif;
+  font-size: 0.9rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #e4ebfb;
+}
+
+.trace-observability-kpi small {
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #4ae183;
+  letter-spacing: 0.06em;
+}
+
+.trace-observability-kpi.accent {
+  box-shadow: inset 3px 0 0 #00daf3;
+}
+
+.trace-observability-kpi.accent strong {
+  color: #c3f5ff;
+}
+
+.trace-observability-kpi.success strong {
+  color: #4ae183;
+}
+
+.trace-observability-kpi.danger strong {
+  color: #ffb4ab;
+}
+
+.trace-observability-kpi.danger small {
+  color: #4ae183;
+}
+
+.trace-observability-filterbar {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 88px;
+  gap: 8px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 16px;
+  background: #1d2538;
+  box-shadow: none;
+}
+
+.trace-filter-block,
+.trace-filter-mode,
+.trace-filter-slider,
+.trace-inline-field {
+  min-width: 0;
+}
+
+.trace-filter-block > span,
+.trace-filter-mode > span,
+.trace-filter-slider span,
+.trace-inline-field > span {
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: #8fa0b6;
+}
+
+.trace-filter-status-block,
+.trace-filter-slider-block,
+.trace-filter-mode-block {
+  display: grid;
+  gap: 4px;
+}
+
+.trace-filter-builder-block {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trace-filter-builder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.trace-query-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.trace-query-join {
+  flex: 0 0 auto;
+  min-width: 34px;
+  padding: 0 8px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(132, 147, 150, 0.08);
+  color: #8fa0b6;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.trace-query-clause {
+  display: grid;
+  grid-template-columns: 138px 74px minmax(150px, 1fr) 28px;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgba(132, 147, 150, 0.12);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(17, 25, 42, 0.96), rgba(14, 22, 39, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.trace-query-clause:focus-within {
+  border-color: rgba(127, 222, 246, 0.22);
+  box-shadow: 0 0 0 1px rgba(127, 222, 246, 0.08);
+}
+
+.trace-query-select,
+.trace-query-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(132, 147, 150, 0.12);
+  border-radius: 9px;
+  background: #0e1627;
+  color: #e4ebfb;
+  font-size: 0.73rem;
+}
+
+.trace-query-select {
+  appearance: none;
+}
+
+.trace-query-input::placeholder {
+  color: rgba(186, 201, 204, 0.5);
+}
+
+.trace-query-select:disabled,
+.trace-query-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.trace-query-remove {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(132, 147, 150, 0.1);
+  color: #aab6ca;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.trace-query-remove:hover {
+  background: rgba(255, 143, 143, 0.14);
+  color: #ffb4ab;
+}
+
+.trace-add-filter-button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px dashed rgba(132, 147, 150, 0.22);
+  border-radius: 12px;
+  background: rgba(14, 22, 39, 0.4);
+  color: #9fb0c8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  align-self: center;
+}
+
+.trace-add-filter-button:hover:not(:disabled) {
+  border-color: rgba(127, 222, 246, 0.24);
+  color: #d8f7ff;
+}
+
+.trace-add-filter-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.trace-filter-block.inline,
+.trace-filter-mode.inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.trace-status-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #0e1627;
+}
+
+.trace-status-button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #c2cce0;
+  font-weight: 800;
+  font-size: 0.7rem;
+}
+
+.trace-status-button.active.success {
+  border-color: rgba(74, 225, 131, 0.3);
+  background: rgba(74, 225, 131, 0.08);
+  color: #4ae183;
+}
+
+.trace-status-button.active.warning {
+  border-color: rgba(255, 203, 107, 0.3);
+  background: rgba(255, 203, 107, 0.08);
+  color: #ffcb6b;
+}
+
+.trace-status-button.active.danger {
+  border-color: rgba(255, 143, 143, 0.3);
+  background: rgba(255, 143, 143, 0.08);
+  color: #ff8f8f;
+}
+
+.trace-filter-slider,
+.trace-filter-slider-block,
+.trace-filter-mode-block {
+  min-width: 0;
+}
+
+.trace-filter-slider-head {
+  display: block;
+}
+
+.trace-filter-slider-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-filter-slider-inline {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.trace-filter-slider-inline strong {
+  flex: 0 0 auto;
+  color: #7fdef6;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.trace-filter-slider-inline input {
+  width: 100%;
+  height: 5px;
+  margin: 0;
+  appearance: none;
+  background: #36405b;
+  border-radius: 999px;
+  accent-color: #7fdef6;
+}
+
+.trace-filter-slider-inline input::-webkit-slider-runnable-track {
+  height: 5px;
+  background: #36405b;
+  border-radius: 999px;
+}
+
+.trace-filter-slider-inline input::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: #8de8fb;
+  box-shadow: 0 0 0 4px rgba(141, 232, 251, 0.12);
+}
+
+.trace-filter-slider-inline input::-moz-range-track {
+  height: 5px;
+  background: #36405b;
+  border: 0;
+  border-radius: 999px;
+}
+
+.trace-filter-slider-inline input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: #8de8fb;
+  box-shadow: 0 0 0 4px rgba(141, 232, 251, 0.12);
+}
+
+.trace-mode-chip,
+.trace-inline-field input,
+.trace-clear-button,
+.trace-apply-button {
+  min-height: 34px;
+  border-radius: 10px;
+}
+
+.trace-mode-chip {
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid rgba(132, 147, 150, 0.18);
+  background: #46506c;
+  color: #e4ebfb;
+  text-align: left;
+  font-size: 0.78rem;
+  width: 100%;
+}
+
+.trace-mode-cluster {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #11192a;
+  border: 1px solid rgba(132, 147, 150, 0.12);
+}
+
+.trace-mode-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #c8d3e7;
+  text-align: center;
+}
+
+.trace-mode-option-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(132, 147, 150, 0.12);
+  color: #9fb0c8;
+  font-size: 0.53rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex: 0 0 auto;
+}
+
+.trace-mode-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.trace-mode-option.active {
+  background: linear-gradient(180deg, rgba(89, 105, 145, 0.5), rgba(63, 74, 103, 0.76));
+  border-color: rgba(127, 222, 246, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 18px rgba(7, 17, 35, 0.22);
+}
+
+.trace-mode-option.active .trace-mode-option-key {
+  background: rgba(127, 222, 246, 0.14);
+  color: #b7f6ff;
+}
+
+.trace-mode-option.active .trace-mode-option-label {
+  color: #f2f6ff;
+}
+
+.trace-mode-helper {
+  margin: 0;
+  min-height: 14px;
+  padding-left: 2px;
+  color: #91a2ba;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trace-inline-field input {
+  width: 100%;
+  border: 1px solid rgba(132, 147, 150, 0.12);
+  background: #0e1627;
+  color: #e4ebfb;
+  padding: 0 11px;
+  font-size: 0.72rem;
+}
+
+.trace-inline-field input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.trace-inline-field input::placeholder {
+  color: rgba(186, 201, 204, 0.5);
+}
+
+.trace-inline-field.compact {
+  min-width: 0;
+}
+
+.trace-inline-actions {
+  gap: 8px;
+  align-self: stretch;
+  justify-content: flex-end;
+  display: flex;
+  align-items: center;
+}
+
+.trace-clear-button,
+.trace-apply-button,
+.trace-page-button {
+  border: 1px solid var(--border);
+  font-weight: 800;
+}
+
+.trace-clear-button {
+  min-width: 72px;
+  padding: 0 14px;
+  background: color-mix(in srgb, var(--chip-bg) 96%, transparent);
+  color: var(--text);
+}
+
+.trace-apply-button {
+  min-width: 96px;
+  width: auto;
+  min-height: 46px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #19c8df, #22d3ee);
+  color: #04111a;
+  border-color: transparent;
+  font-size: 0.71rem;
+  letter-spacing: 0.04em;
+  border-radius: 14px;
+  align-self: center;
+}
+
+.trace-scope-select-menu {
+  width: 320px;
+  max-width: min(360px, calc(100vw - 48px));
+  padding: 8px;
+  border-radius: 12px;
+  background: #1d2538;
+  box-shadow: 0 24px 48px rgba(5, 12, 24, 0.42);
+}
+
+.trace-scope-search {
+  padding-bottom: 8px;
+  background: #1d2538;
+}
+
+.trace-scope-search input {
+  min-height: 36px;
+  border-radius: 10px;
+  border-color: rgba(132, 147, 150, 0.18);
+  background: #0e1627;
+  padding: 0 12px;
+  font-size: 0.78rem;
+}
+
+.scope-option {
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 0.76rem;
+}
+
+.trace-observability-table {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.trace-results-table-compact {
+  min-width: 980px;
+}
+
+.trace-results-table-compact th,
+.trace-results-table-compact td {
+  padding: 12px 16px;
+}
+
+.trace-results-table-compact th {
+  font-size: 0.62rem;
+}
+
+.table-center {
+  text-align: center;
+}
+
+.trace-row-compact:hover {
+  background: var(--row-hover);
+}
+
+.trace-row-compact.warning {
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+}
+
+.trace-row-compact.failure {
+  background: color-mix(in srgb, var(--danger-soft) 32%, transparent);
+}
+
+.trace-latency-breakdown {
+  display: grid;
+  gap: 10px;
+}
+
+.trace-latency-bar {
+  position: relative;
+  width: 160px;
+  max-width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(4, 11, 26, 0.58);
+}
+
+.trace-latency-segment {
+  display: block;
+  height: 100%;
+  float: left;
+}
+
+.trace-latency-breakdown.success .trace-latency-segment.entry {
+  background: #18d1ef;
+}
+
+.trace-latency-breakdown.success .trace-latency-segment.core {
+  background: #b2f1ff;
+}
+
+.trace-latency-breakdown.warning .trace-latency-segment.entry {
+  background: #ffd56a;
+}
+
+.trace-latency-breakdown.warning .trace-latency-segment.core {
+  background: #fff1b7;
+}
+
+.trace-latency-breakdown.failure .trace-latency-segment.entry {
+  background: #ffb3b3;
+}
+
+.trace-latency-breakdown.failure .trace-latency-segment.core {
+  background: #cb1919;
+}
+
+.trace-latency-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+  color: var(--muted-strong);
+}
+
+.trace-latency-values strong {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.trace-latency-breakdown.warning .trace-latency-values strong {
+  color: var(--warning);
+}
+
+.trace-latency-breakdown.failure .trace-latency-values strong {
+  color: var(--danger);
+}
+
+.trace-id-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.trace-id-link:hover {
+  text-decoration: underline;
+}
+
+.trace-app-cell {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.trace-api-cell {
+  display: block;
+}
+
+.trace-api-cell span {
+  display: block;
+  color: var(--muted-strong);
+  font-size: 0.74rem;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+}
+
+.trace-channel-cell {
+  color: var(--muted-strong);
+  font-size: 0.74rem;
+}
+
+.trace-timestamp-cell {
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+}
+
+.strong-text {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.trace-observability-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.trace-footer-pager {
+  gap: 8px;
+}
+
+.trace-page-button {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--chip-bg) 96%, transparent);
+  color: var(--text);
+}
+
+.trace-page-indicator {
+  display: inline-flex;
+  min-width: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-shell.theme-light .trace-observability-kpi strong {
+  color: #1f2737;
+}
+
+.app-shell.theme-light .trace-observability-kpi.success strong {
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-observability-kpi.danger strong {
+  color: #9e422c;
+}
+
+.app-shell.theme-light .trace-apply-button {
+  color: #fff6ed;
+}
+
+.app-shell.theme-light .trace-floating-monitor {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.app-shell.theme-light .trace-observability-header {
+  border-color: rgba(175, 179, 174, 0.42);
+  border-radius: 22px;
+  background: rgba(250, 249, 246, 0.9);
+  box-shadow: 0 12px 28px rgba(64, 55, 27, 0.06);
+}
+
+.app-shell.theme-light .trace-observability-topbar {
+  background: rgba(250, 249, 246, 0.9);
+}
+
+.app-shell.theme-light .trace-header-badge {
+  border-color: rgba(121, 89, 0, 0.2);
+  background: linear-gradient(145deg, #fffaf0, #f2eee4);
+  color: #795900;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.app-shell.theme-light .trace-header-path {
+  color: #8a8d87;
+}
+
+.app-shell.theme-light .trace-header-path strong,
+.app-shell.theme-light .trace-header-link,
+.app-shell.theme-light .trace-header-control-label {
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-header-day-button,
+.app-shell.theme-light .trace-header-chip,
+.app-shell.theme-light .trace-theme-switch {
+  border-color: rgba(175, 179, 174, 0.38);
+  background: #ffffff;
+  color: #2f3430;
+  box-shadow: 0 2px 6px rgba(64, 55, 27, 0.04);
+}
+
+.app-shell.theme-light .trace-theme-switch {
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell.theme-light .trace-theme-switch-track {
+  background: rgba(121, 89, 0, 0.12);
+  border-color: rgba(121, 89, 0, 0.12);
+}
+
+.app-shell.theme-light .trace-theme-switch-thumb {
+  background: rgba(121, 89, 0, 0.34);
+  box-shadow: none;
+}
+
+.app-shell.theme-light .trace-theme-switch.light .trace-theme-switch-thumb {
+  background: #fffdf6;
+  box-shadow:
+    0 0 0 3px rgba(255, 205, 97, 0.16),
+    0 0 24px rgba(255, 205, 97, 0.38);
+}
+
+.app-shell.theme-light .trace-theme-switch-cord {
+  background: rgba(121, 89, 0, 0.28);
+}
+
+.app-shell.theme-light .trace-theme-switch-cord::after {
+  background: #795900;
+}
+
+.app-shell.theme-light .trace-header-day-button.active {
+  background: #8b6400;
+  color: #fff6ed;
+  box-shadow: none;
+}
+
+.app-shell.theme-light .scope-select-arrow,
+.app-shell.theme-light .trace-header-updated {
+  color: #777c77;
+}
+
+.app-shell.theme-light .trace-observability-kpi {
+  background: #ffffff;
+  border: 1px solid rgba(255, 223, 160, 0.5);
+  box-shadow: 0 6px 18px rgba(64, 55, 27, 0.04);
+}
+
+.app-shell.theme-light .trace-observability-kpi span {
+  color: rgba(92, 96, 92, 0.72);
+}
+
+.app-shell.theme-light .trace-observability-kpi small {
+  color: #795900;
+}
+
+.app-shell.theme-light .trace-observability-kpi.accent {
+  box-shadow: inset 3px 0 0 #c08d13, 0 6px 18px rgba(64, 55, 27, 0.04);
+}
+
+.app-shell.theme-light .trace-observability-kpi.accent strong {
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-observability-filterbar {
+  background: #edeeea;
+  border: 1px solid rgba(175, 179, 174, 0.34);
+}
+
+.app-shell.theme-light .trace-filter-block > span,
+.app-shell.theme-light .trace-filter-mode > span,
+.app-shell.theme-light .trace-filter-slider span,
+.app-shell.theme-light .trace-inline-field > span {
+  color: #795900;
+}
+
+.app-shell.theme-light .trace-status-toggle {
+  background: #ffffff;
+  border: 1px solid rgba(175, 179, 174, 0.3);
+}
+
+.app-shell.theme-light .trace-status-button {
+  color: #5c605c;
+}
+
+.app-shell.theme-light .trace-status-button.active.success {
+  border-color: rgba(121, 89, 0, 0.22);
+  background: rgba(255, 223, 160, 0.42);
+  color: #795900;
+}
+
+.app-shell.theme-light .trace-status-button.active.warning {
+  border-color: rgba(158, 105, 0, 0.18);
+  background: rgba(255, 223, 160, 0.3);
+  color: #8b6400;
+}
+
+.app-shell.theme-light .trace-status-button.active.danger {
+  border-color: rgba(158, 66, 44, 0.18);
+  background: rgba(254, 139, 112, 0.18);
+  color: #9e422c;
+}
+
+.app-shell.theme-light .trace-query-clause {
+  background: #f5f4ef;
+  border-color: rgba(175, 179, 174, 0.28);
+}
+
+.app-shell.theme-light .trace-query-select,
+.app-shell.theme-light .trace-query-input {
+  background: #ffffff;
+  border-color: rgba(175, 179, 174, 0.22);
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-query-input::placeholder {
+  color: rgba(92, 96, 92, 0.48);
+}
+
+.app-shell.theme-light .trace-query-remove {
+  background: rgba(175, 179, 174, 0.12);
+  color: #777c77;
+}
+
+.app-shell.theme-light .trace-add-filter-button {
+  background: rgba(255, 255, 255, 0.68);
+  border-color: rgba(175, 179, 174, 0.36);
+  color: #777c77;
+}
+
+.app-shell.theme-light .trace-filter-slider-inline strong {
+  color: #8b6400;
+}
+
+.app-shell.theme-light .trace-filter-slider-inline input,
+.app-shell.theme-light .trace-filter-slider-inline input::-webkit-slider-runnable-track,
+.app-shell.theme-light .trace-filter-slider-inline input::-moz-range-track {
+  background: #d7ddd7;
+}
+
+.app-shell.theme-light .trace-filter-slider-inline input::-webkit-slider-thumb,
+.app-shell.theme-light .trace-filter-slider-inline input::-moz-range-thumb {
+  background: #8b6400;
+  box-shadow: 0 0 0 3px rgba(139, 100, 0, 0.12);
+}
+
+.app-shell.theme-light .trace-filter-slider-head strong {
+  color: #8b6400;
+}
+
+.app-shell.theme-light .trace-mode-cluster {
+  background: #f5f4ef;
+  border-color: rgba(175, 179, 174, 0.28);
+}
+
+.app-shell.theme-light .trace-mode-option {
+  color: #5c605c;
+}
+
+.app-shell.theme-light .trace-mode-option-key {
+  background: rgba(175, 179, 174, 0.16);
+  color: #777c77;
+}
+
+.app-shell.theme-light .trace-mode-option.active {
+  background: linear-gradient(180deg, rgba(255, 223, 160, 0.48), rgba(255, 239, 200, 0.9));
+  border-color: rgba(121, 89, 0, 0.18);
+}
+
+.app-shell.theme-light .trace-mode-option.active .trace-mode-option-key {
+  background: rgba(121, 89, 0, 0.12);
+  color: #8b6400;
+}
+
+.app-shell.theme-light .trace-mode-option.active .trace-mode-option-label {
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-mode-helper {
+  color: #8b9089;
+}
+
+.app-shell.theme-light .trace-mode-chip,
+.app-shell.theme-light .trace-inline-field input,
+.app-shell.theme-light .trace-scope-search input {
+  border-color: rgba(175, 179, 174, 0.28);
+  background: #ffffff;
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-inline-field input::placeholder,
+.app-shell.theme-light .trace-scope-search input::placeholder {
+  color: rgba(119, 124, 119, 0.72);
+}
+
+.app-shell.theme-light .trace-apply-button {
+  background: linear-gradient(135deg, #795900, #8b6400);
+}
+
+.app-shell.theme-light .trace-scope-select-menu {
+  background: #faf9f6;
+  border-color: rgba(175, 179, 174, 0.36);
+  box-shadow: 0 24px 48px rgba(64, 55, 27, 0.1);
+}
+
+.app-shell.theme-light .trace-scope-search {
+  background: #faf9f6;
+}
+
+.app-shell.theme-light .scope-option {
+  color: #5c605c;
+}
+
+.app-shell.theme-light .scope-option:hover,
+.app-shell.theme-light .scope-option.active {
+  background: rgba(255, 223, 160, 0.36);
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-observability-table {
+  border: 1px solid rgba(175, 179, 174, 0.34);
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(64, 55, 27, 0.04);
+}
+
+.app-shell.theme-light .trace-results-table-compact th {
+  background: rgba(237, 238, 234, 0.64);
+  color: #777c77;
+}
+
+.app-shell.theme-light .trace-row-compact:hover {
+  background: rgba(244, 244, 240, 0.8);
+}
+
+.app-shell.theme-light .trace-row-compact.warning {
+  background: rgba(255, 237, 128, 0.14);
+}
+
+.app-shell.theme-light .trace-row-compact.failure {
+  background: rgba(254, 139, 112, 0.08);
+}
+
+.app-shell.theme-light .trace-latency-bar {
+  background: rgba(207, 213, 210, 0.62);
+}
+
+.app-shell.theme-light .trace-latency-breakdown.success .trace-latency-segment.entry {
+  background: #17bfd8;
+}
+
+.app-shell.theme-light .trace-latency-breakdown.success .trace-latency-segment.core {
+  background: #8de6f2;
+}
+
+.app-shell.theme-light .trace-latency-breakdown.warning .trace-latency-segment.entry {
+  background: #e8bb49;
+}
+
+.app-shell.theme-light .trace-latency-breakdown.warning .trace-latency-segment.core {
+  background: #f5ddb0;
+}
+
+.app-shell.theme-light .trace-latency-breakdown.failure .trace-latency-segment.entry {
+  background: #f5a3a3;
+}
+
+.app-shell.theme-light .trace-latency-breakdown.failure .trace-latency-segment.core {
+  background: #c62828;
+}
+
+.app-shell.theme-light .trace-latency-values {
+  color: #6c797d;
+}
+
+.app-shell.theme-light .trace-latency-values strong {
+  color: #2f3430;
+}
+
+.app-shell.theme-light .status-badge.warning {
+  color: #8b6400;
+  border-color: rgba(139, 100, 0, 0.18);
+  background: rgba(255, 223, 160, 0.4);
+}
+
+.app-shell.theme-light .status-badge.success {
+  color: #087f5b;
+  border-color: rgba(8, 127, 91, 0.18);
+  background: rgba(188, 242, 211, 0.52);
+}
+
+.app-shell.theme-light .status-badge.failure {
+  color: #ba1a1a;
+  border-color: rgba(186, 26, 26, 0.16);
+  background: rgba(255, 218, 214, 0.72);
+}
+
+.app-shell.theme-light .trace-id-link {
+  color: #8b6400;
+}
+
+.app-shell.theme-light .trace-id-link,
+.app-shell.theme-light .trace-api-cell span,
+.app-shell.theme-light .trace-channel-cell,
+.app-shell.theme-light .trace-timestamp-cell,
+  .app-shell.theme-light .trace-observability-footer {
+  color: #5c605c;
+}
+
+.app-shell.theme-light .trace-app-cell {
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-page-indicator {
+  background: rgba(255, 223, 160, 0.36);
+  color: #795900;
+  border: 1px solid rgba(121, 89, 0, 0.18);
+}
+
+@media (max-width: 1500px) {
+  .kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .trace-observability-filterbar {
+    grid-template-columns: 140px minmax(0, 1fr) 84px;
+  }
+}
+
+@media (max-width: 980px) {
+  .trace-filter-bar-rich,
+  .detail-grid,
+  .trace-stage-strip,
+  .payload-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trace-toolbar,
+  .trace-hero-bar,
+  .trace-workspace-top,
+  .trace-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .trace-hero-microstats {
+    justify-content: flex-start;
+  }
+
+  .trace-observability-topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .trace-observability-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .trace-observability-filterbar {
+    grid-template-columns: 1fr;
+  }
+
+  .trace-query-clause {
+    grid-template-columns: 1fr 72px minmax(120px, 1fr) 28px;
+  }
+
+  .payload-grid.e2e {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 840px) {
+  .main-shell {
+    padding: 12px 12px 22px;
+  }
+
+  .trace-toolbar,
+  .trace-filter-bar,
+  .trace-workspace-top,
+  .panel-header,
+  .trace-footer,
+  .pager {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .kpi-grid,
+  .trace-filter-bar-rich,
+  .detail-grid,
+  .trace-stage-strip,
+  .payload-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payload-grid.e2e {
+    grid-template-columns: 1fr;
+  }
+
+  .trace-toolbar-left,
+  .trace-breadcrumbs,
+  .trace-toolbar-actions,
+  .trace-filter-actions,
+  .trace-hero-bar,
+  .pager,
+  .pager-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .trace-command-search {
+    min-width: 100%;
+  }
+
+  .day-toggle {
+    flex-wrap: wrap;
+  }
+
+  .trace-toolbar-field.compact input {
+    width: 100%;
+  }
+
+  .drawer-shell {
+    padding: 12px;
+  }
+
+  .drawer-card {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+    max-height: calc(100vh - 24px);
+    padding: 18px;
+  }
+}
+
+
+
