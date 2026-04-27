@@ -12,6 +12,10 @@ public final class TraceDtos {
         String day,
         String generatedAt,
         DashboardKpis kpis,
+        long totalElements,
+        int totalPages,
+        int page,
+        int size,
         List<ApiSummaryRow> rows
     ) {
     }
@@ -66,8 +70,18 @@ public final class TraceDtos {
         Double averageExternalLatencyMs,
         Integer maxExternalLatencyMs,
         Double averageTotalLatencyMs,
-        Integer maxTotalLatencyMs,
-        List<TraceScopeOption> scopeOptions
+        Integer maxTotalLatencyMs
+    ) {
+    }
+
+    public record TraceScopeSearchResponse(
+        String day,
+        String generatedAt,
+        long totalElements,
+        int totalPages,
+        int page,
+        int size,
+        List<TraceScopeOption> rows
     ) {
     }
 
@@ -100,6 +114,7 @@ public final class TraceDtos {
         LocalDateTime requestTimestamp,
         String status,
         String httpSeries,
+        Integer httpStatusCode,
         Integer requestReceivedLatencyMs,
         Integer externalLatencyMs,
         Integer totalLatencyMs
@@ -120,6 +135,7 @@ public final class TraceDtos {
         LocalDateTime requestTimestamp,
         String status,
         String httpSeries,
+        Integer httpStatusCode,
         Integer requestReceivedLatencyMs,
         Integer externalLatencyMs,
         Integer totalLatencyMs

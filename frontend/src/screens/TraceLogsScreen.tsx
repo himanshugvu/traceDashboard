@@ -5,6 +5,7 @@ import type {
   TraceDetailResponse,
   TraceFiltersState,
   TraceOverviewResponse,
+  TraceScopeSearchResponse,
   TraceSearchResponse
 } from "../types";
 
@@ -20,33 +21,26 @@ type TraceLogsScreenProps = {
   embedded?: boolean;
 };
 
-type HttpSeriesFilter = "200" | "400" | "500";
+type HttpSeriesFilter = "2xx" | "4xx" | "5xx";
 type RowTone = "success" | "warning" | "failure";
 type QueryField = "correlation" | "channel" | "account" | "customer" | "latency";
 type QueryOperator = "=" | ">" | "<" | "all";
+type FilterPreset = "correlation" | "correlationChannel" | "account" | "customer";
 type QueryClause = {
   field: QueryField;
   operator: QueryOperator;
   value: string;
 };
 
-const QUERY_FIELD_OPTIONS: Array<{ value: QueryField; label: string }> = [
+const FILTER_PRESET_OPTIONS: Array<{ value: FilterPreset; label: string }> = [
   { value: "correlation", label: "Correlation ID" },
-  { value: "channel", label: "Channel ID" },
-  { value: "account", label: "Account" },
-  { value: "customer", label: "Customer" },
-  { value: "latency", label: "Latency" }
-];
-
-const LATENCY_OPERATOR_OPTIONS: Array<{ value: QueryOperator; label: string }> = [
-  { value: "all", label: "All" },
-  { value: ">", label: ">" },
-  { value: "<", label: "<" },
-  { value: "=", label: "=" }
+  { value: "correlationChannel", label: "Correlation + Channel" },
+  { value: "account", label: "Account Number" },
+  { value: "customer", label: "Customer ID" }
 ];
 
 const PAGE_SIZE = 50;
-const MAX_FILTER_CLAUSES = 3;
+const SCOPE_PAGE_SIZE = 25;
 
 function defaultOperator(field: QueryField): QueryOperator {
   return field === "latency" ? "all" : "=";
@@ -60,6 +54,32 @@ function createQueryClause(field: QueryField = "correlation"): QueryClause {
   };
 }
 
+function createClausesForPreset(preset: FilterPreset): QueryClause[] {
+  if (preset === "correlationChannel") {
+    return [createQueryClause("correlation"), createQueryClause("channel")];
+  }
+  if (preset === "account") {
+    return [createQueryClause("account")];
+  }
+  if (preset === "customer") {
+    return [createQueryClause("customer")];
+  }
+  return [createQueryClause("correlation")];
+}
+
+function presetFields(preset: FilterPreset): QueryField[] {
+  if (preset === "correlationChannel") {
+    return ["correlation", "channel"];
+  }
+  if (preset === "account") {
+    return ["account"];
+  }
+  if (preset === "customer") {
+    return ["customer"];
+  }
+  return ["correlation"];
+}
+
 function fieldPlaceholder(field: QueryField) {
   if (field === "latency") {
     return "0-1000 ms";
@@ -71,9 +91,9 @@ function fieldPlaceholder(field: QueryField) {
     return "Channel ID";
   }
   if (field === "account") {
-    return "Account";
+    return "Account Number";
   }
-  return "Customer";
+  return "Customer ID";
 }
 
 function todayIso() {
@@ -296,14 +316,17 @@ function getRowTone(httpSeries: string | null | undefined): RowTone {
   return "success";
 }
 
-function getStatusLabel(httpSeries: string | null | undefined) {
+function getStatusLabel(httpStatusCode: number | null | undefined, httpSeries: string | null | undefined) {
+  if (httpStatusCode !== null && httpStatusCode !== undefined) {
+    return String(httpStatusCode);
+  }
   if (httpSeries === "500") {
-    return "500 ERR";
+    return "500";
   }
   if (httpSeries === "400") {
-    return "400 WARN";
+    return "404";
   }
-  return "200 OK";
+  return "200";
 }
 
 export function TraceLogsScreen({
@@ -319,16 +342,20 @@ export function TraceLogsScreen({
   const sectionRef = useRef<HTMLElement | null>(null);
   const dateInputRef = useRef<HTMLInputElement | null>(null);
   const scopeMenuRef = useRef<HTMLDivElement | null>(null);
-  const [errorType, setErrorType] = useState<HttpSeriesFilter>("200");
+  const [errorType, setErrorType] = useState<HttpSeriesFilter>("2xx");
   const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
   const [scopeQuery, setScopeQuery] = useState("");
-  const [filterClauses, setFilterClauses] = useState<QueryClause[]>(() => [createQueryClause("correlation")]);
+  const [scopePage, setScopePage] = useState(0);
+  const [filterPreset, setFilterPreset] = useState<FilterPreset>("correlation");
+  const [filterClauses, setFilterClauses] = useState<QueryClause[]>(() => createClausesForPreset("correlation"));
   const [page, setPage] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState<TraceFiltersState>(() =>
     buildDefaultFilters(day, initialApiName, initialAppName)
   );
   const [overviewData, setOverviewData] = useState<TraceOverviewResponse | null>(null);
+  const [scopeData, setScopeData] = useState<TraceScopeSearchResponse | null>(null);
+  const [scopeLoading, setScopeLoading] = useState(false);
   const [searchData, setSearchData] = useState<TraceSearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -339,10 +366,12 @@ export function TraceLogsScreen({
 
   useEffect(() => {
     setAppliedFilters(buildDefaultFilters(day, initialApiName, initialAppName));
-    setFilterClauses([createQueryClause("correlation")]);
-    setErrorType("200");
+    setFilterPreset("correlation");
+    setFilterClauses(createClausesForPreset("correlation"));
+    setErrorType("2xx");
     setScopeMenuOpen(false);
     setScopeQuery("");
+    setScopePage(0);
     setPage(0);
   }, [day, initialApiName, initialAppName]);
 
@@ -383,6 +412,38 @@ export function TraceLogsScreen({
 
     return () => controller.abort();
   }, [day, initialAppName, initialApiName, refreshToken]);
+
+  useEffect(() => {
+    if (!scopeMenuOpen) {
+      return;
+    }
+
+    const controller = new AbortController();
+    setScopeLoading(true);
+
+    const params = new URLSearchParams();
+    params.set("date", day);
+    params.set("page", String(scopePage));
+    params.set("size", String(SCOPE_PAGE_SIZE));
+    if (scopeQuery.trim()) {
+      params.set("query", scopeQuery.trim());
+    }
+
+    fetchJson<TraceScopeSearchResponse>(`/api/v1/traces/scopes?${params.toString()}`, controller.signal)
+      .then(setScopeData)
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setScopeData(null);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setScopeLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [day, refreshToken, scopeMenuOpen, scopePage, scopeQuery]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -442,25 +503,12 @@ export function TraceLogsScreen({
   const successRate = totalRequests === 0 ? 0 : (successCount * 100) / totalRequests;
   const scopeLabel = `${displayAppName(initialAppName)} / ${displayApiName(initialApiName)}`;
   const filteredScopeOptions = useMemo(() => {
-    const normalizedQuery = scopeQuery.trim().toLowerCase();
-    const options = overviewData?.scopeOptions ?? [];
     const allOption = { appName: "", apiName: "" };
-    const dedupedOptions = options.filter((option) => option.appName.trim() || option.apiName.trim());
-    const filteredOptions = normalizedQuery
-      ? dedupedOptions.filter((option) =>
-          `${option.appName} ${option.apiName} ${displayAppName(option.appName)} ${displayApiName(option.apiName)}`
-            .toLowerCase()
-            .includes(normalizedQuery)
-        )
-      : dedupedOptions;
-
-    if (!normalizedQuery || "all apps all apis".includes(normalizedQuery)) {
-      return [allOption, ...filteredOptions];
-    }
-
-    return filteredOptions;
-  }, [overviewData?.scopeOptions, scopeQuery]);
-  const warningCount = errorType === "400" ? searchData?.totalElements ?? 0 : 0;
+    const rows = (scopeData?.rows ?? []).filter((option) => option.appName.trim() || option.apiName.trim());
+    return scopePage === 0 ? [allOption, ...rows] : rows;
+  }, [scopeData?.rows, scopePage]);
+  const canLoadMoreScopeOptions = (scopeData?.page ?? 0) + 1 < (scopeData?.totalPages ?? 0);
+  const warningCount = errorType === "4xx" ? searchData?.totalElements ?? 0 : 0;
   const visibleRows = searchData?.rows ?? [];
   const filterTotal = searchData?.totalElements ?? 0;
   const isCustomDay = day !== todayIso() && day !== yesterdayIso();
@@ -483,8 +531,9 @@ export function TraceLogsScreen({
   }
 
   function resetFilters() {
-    setFilterClauses([createQueryClause("correlation")]);
-    setErrorType("200");
+    setFilterPreset("correlation");
+    setFilterClauses(createClausesForPreset("correlation"));
+    setErrorType("2xx");
     setAppliedFilters(buildDefaultFilters(day, initialApiName, initialAppName));
     setPage(0);
   }
@@ -493,22 +542,9 @@ export function TraceLogsScreen({
     setFilterClauses((current) => current.map((clause, clauseIndex) => (clauseIndex === index ? next : clause)));
   }
 
-  function nextAvailableField(currentClauses: QueryClause[]) {
-    const usedFields = new Set(currentClauses.map((clause) => clause.field));
-    return QUERY_FIELD_OPTIONS.find((option) => !usedFields.has(option.value))?.value ?? "correlation";
-  }
-
-  function addFilterClause() {
-    setFilterClauses((current) => {
-      if (current.length >= MAX_FILTER_CLAUSES) {
-        return current;
-      }
-      return [...current, createQueryClause(nextAvailableField(current))];
-    });
-  }
-
-  function removeFilterClause(index: number) {
-    setFilterClauses((current) => (current.length <= 1 ? current : current.filter((_, clauseIndex) => clauseIndex !== index)));
+  function applyPreset(nextPreset: FilterPreset) {
+    setFilterPreset(nextPreset);
+    setFilterClauses(createClausesForPreset(nextPreset));
   }
 
   function downloadAllPayloads() {
@@ -582,14 +618,26 @@ export function TraceLogsScreen({
                 </button>
               </div>
 
-              <button className="trace-header-chip" type="button" onClick={openDatePicker}>
-                {day.split("-").reverse().join("/")}
-              </button>
+              <div className="trace-header-date-field">
+                <button className="trace-header-chip" type="button" onClick={openDatePicker}>
+                  {day.split("-").reverse().join("/")}
+                </button>
+                <label className="trace-toolbar-date-input">
+                  <input ref={dateInputRef} type="date" value={day} onChange={(event) => onDayChange(event.target.value)} />
+                </label>
+              </div>
               <div className="scope-field trace-header-scope-field" ref={scopeMenuRef}>
                 <button
                   className="trace-header-chip trace-header-scope-chip scope-select-button"
                   type="button"
-                  onClick={() => setScopeMenuOpen((value) => !value)}
+                  onClick={() =>
+                    setScopeMenuOpen((value) => {
+                      if (!value) {
+                        setScopePage(0);
+                      }
+                      return !value;
+                    })
+                  }
                 >
                   <span>{scopeLabel}</span>
                   <span className="scope-select-arrow" aria-hidden="true" />
@@ -600,31 +648,44 @@ export function TraceLogsScreen({
                       <input
                         autoFocus
                         value={scopeQuery}
-                        onChange={(event) => setScopeQuery(event.target.value)}
+                        onChange={(event) => {
+                          setScopeQuery(event.target.value);
+                          setScopePage(0);
+                        }}
                         placeholder="Search app or API"
                       />
                     </div>
-                    {filteredScopeOptions.length === 0 ? (
+                    {scopeLoading && filteredScopeOptions.length === 0 ? (
+                      <div className="scope-empty">Loading app/API options...</div>
+                    ) : filteredScopeOptions.length === 0 ? (
                       <div className="scope-empty">No app/API matches.</div>
                     ) : (
-                      filteredScopeOptions.map((option) => {
-                        const optionLabel = `${displayAppName(option.appName)} / ${displayApiName(option.apiName)}`;
-                        const isActive = option.appName === initialAppName && option.apiName === initialApiName;
-                        return (
-                          <button
-                            key={`${option.appName}-${option.apiName}`}
-                            className={isActive ? "scope-option active" : "scope-option"}
-                            type="button"
-                            onClick={() => {
-                              onScopeChange(option.appName, option.apiName);
-                              setScopeMenuOpen(false);
-                              setScopeQuery("");
-                            }}
-                          >
-                            {optionLabel}
+                      <>
+                        {filteredScopeOptions.map((option) => {
+                          const optionLabel = `${displayAppName(option.appName)} / ${displayApiName(option.apiName)}`;
+                          const isActive = option.appName === initialAppName && option.apiName === initialApiName;
+                          return (
+                            <button
+                              key={`${option.appName}-${option.apiName}`}
+                              className={isActive ? "scope-option active" : "scope-option"}
+                              type="button"
+                              onClick={() => {
+                                onScopeChange(option.appName, option.apiName);
+                                setScopeMenuOpen(false);
+                                setScopeQuery("");
+                                setScopePage(0);
+                              }}
+                            >
+                              {optionLabel}
+                            </button>
+                          );
+                        })}
+                        {canLoadMoreScopeOptions ? (
+                          <button className="scope-option scope-option-more" type="button" onClick={() => setScopePage((value) => value + 1)}>
+                            {scopeLoading ? "Loading more..." : "Load more"}
                           </button>
-                        );
-                      })
+                        ) : null}
+                      </>
                     )}
                   </div>
                 ) : null}
@@ -647,9 +708,6 @@ export function TraceLogsScreen({
               <span className="trace-header-updated">
                 Updated {searchData?.generatedAt ? formatDateTime(searchData.generatedAt) : "--"}
               </span>
-              <label className="trace-toolbar-date-input">
-                <input ref={dateInputRef} type="date" value={day} onChange={(event) => onDayChange(event.target.value)} />
-              </label>
             </div>
           </div>
         </header>
@@ -703,133 +761,100 @@ export function TraceLogsScreen({
 
         <div className="trace-observability-filterbar">
           <div className="trace-filter-block trace-filter-status-block">
-            <span>Status</span>
             <div className="trace-status-toggle">
               <button
-                className={errorType === "200" ? "trace-status-button active success" : "trace-status-button"}
+                className={errorType === "2xx" ? "trace-status-button active success" : "trace-status-button"}
                 type="button"
                 onClick={() => {
-                  setErrorType("200");
+                  setErrorType("2xx");
                   setPage(0);
                 }}
               >
-                200
+                2xx
               </button>
               <button
-                className={errorType === "400" ? "trace-status-button active warning" : "trace-status-button"}
+                className={errorType === "4xx" ? "trace-status-button active warning" : "trace-status-button"}
                 type="button"
                 onClick={() => {
-                  setErrorType("400");
+                  setErrorType("4xx");
                   setPage(0);
                 }}
               >
-                400
+                4xx
               </button>
               <button
-                className={errorType === "500" ? "trace-status-button active danger" : "trace-status-button"}
+                className={errorType === "5xx" ? "trace-status-button active danger" : "trace-status-button"}
                 type="button"
                 onClick={() => {
-                  setErrorType("500");
+                  setErrorType("5xx");
                   setPage(0);
                 }}
               >
-                500
+                5xx
               </button>
             </div>
           </div>
 
           <div className="trace-filter-builder-block">
-            <span>Filters</span>
             <div className="trace-filter-builder">
-              {filterClauses.map((clause, index) => {
-                const availableFields = QUERY_FIELD_OPTIONS.filter((option) =>
-                  option.value === clause.field ||
-                  !filterClauses.some((otherClause, otherIndex) => otherIndex !== index && otherClause.field === option.value)
-                );
-                const isLatency = clause.field === "latency";
-                return (
-                  <div key={`${clause.field}-${index}`} className="trace-query-item">
-                    {index > 0 ? <span className="trace-query-join">AND</span> : null}
-                    <div className="trace-query-clause">
-                      <select
-                        className="trace-query-select trace-query-field"
-                        value={clause.field}
-                        onChange={(event) => {
-                          const nextField = event.target.value as QueryField;
-                          updateClause(index, {
-                            field: nextField,
-                            operator: defaultOperator(nextField),
-                            value: nextField === "latency" ? clause.value : ""
-                          });
-                        }}
-                      >
-                        {availableFields.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        className="trace-query-select trace-query-operator"
-                        value={clause.operator}
-                        onChange={(event) =>
-                          updateClause(index, {
-                            ...clause,
-                            operator: event.target.value as QueryOperator,
-                            value: event.target.value === "all" ? "" : clause.value
-                          })
-                        }
-                        disabled={!isLatency}
-                      >
-                        {(isLatency ? LATENCY_OPERATOR_OPTIONS : [{ value: "=", label: "=" }]).map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      <input
-                        className="trace-query-input"
-                        type={isLatency ? "number" : "text"}
-                        min={isLatency ? 0 : undefined}
-                        max={isLatency ? 1000 : undefined}
-                        step={isLatency ? 25 : undefined}
-                        value={clause.value}
-                        onChange={(event) => updateClause(index, { ...clause, value: event.target.value })}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            applyFilters();
+              <label className="trace-filter-mode-select">
+                <span>Filter by</span>
+                <select
+                  className="trace-query-select trace-filter-mode-input"
+                  value={filterPreset}
+                  onChange={(event) => applyPreset(event.target.value as FilterPreset)}
+                >
+                  {FILTER_PRESET_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className={`trace-filter-inputs preset-${filterPreset}`}>
+                {presetFields(filterPreset).map((field, index) => {
+                  const clause = filterClauses[index] ?? createQueryClause(field);
+                  return (
+                    <label key={`${field}-${index}`} className="trace-filter-inline-field">
+                      <span>{fieldPlaceholder(field)}</span>
+                      <div className="trace-query-clause compact">
+                        <input
+                          className="trace-query-input"
+                          type="text"
+                          value={clause.value}
+                          onChange={(event) =>
+                            updateClause(index, {
+                              field,
+                              operator: "=",
+                              value: event.target.value
+                            })
                           }
-                        }}
-                        placeholder={fieldPlaceholder(clause.field)}
-                        disabled={isLatency && clause.operator === "all"}
-                      />
-
-                      {filterClauses.length > 1 ? (
-                        <button className="trace-query-remove" type="button" onClick={() => removeFilterClause(index)} aria-label="Remove filter">
-                          ×
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-
-              <button
-                className="trace-add-filter-button"
-                type="button"
-                onClick={addFilterClause}
-                disabled={filterClauses.length >= MAX_FILTER_CLAUSES}
-              >
-                + Add filter
-              </button>
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              applyFilters();
+                            }
+                          }}
+                          placeholder={fieldPlaceholder(field)}
+                        />
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           <div className="trace-inline-actions">
-            <button className="trace-apply-button" type="button" onClick={applyFilters}>
-              Apply
+            <button className="trace-action-button search" type="button" onClick={applyFilters} aria-label="Search" title="Search">
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="trace-action-icon">
+                <circle cx="11" cy="11" r="5.5" />
+                <path d="M16 16L20 20" />
+              </svg>
+            </button>
+            <button className="trace-action-button clear" type="button" onClick={resetFilters} aria-label="Clear filters" title="Clear filters">
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="trace-action-icon">
+                <path d="M6 6L18 18M18 6L6 18" />
+              </svg>
             </button>
           </div>
         </div>
@@ -914,7 +939,7 @@ export function TraceLogsScreen({
                           </div>
                         </td>
                         <td className="table-center">
-                          <span className={`status-badge ${tone}`}>{getStatusLabel(row.httpSeries)}</span>
+                          <span className={`status-badge ${tone}`}>{getStatusLabel(row.httpStatusCode, row.httpSeries)}</span>
                         </td>
                       </tr>
                     );

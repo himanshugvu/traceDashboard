@@ -1,0 +1,25 @@
+INSERT INTO trace_record (
+  correlation_id,
+  channel_id,
+  api_name,
+  app_name,
+  status,
+  http_series,
+  request_payload,
+  channel_payload,
+  core_payload,
+  core_response,
+  channel_response,
+  request_received_latency_ms,
+  external_latency_ms,
+  total_latency_ms,
+  requesttimestamp
+) VALUES
+  ('CORR-20260427-2701', 'WEB-APR-27-01', 'CustomerSearch', 'RetailPortal', 'SUCCESS', '200', '{"customerId":"CUST-2701","query":"search"}', '{"entryChannel":"WEB","device":"desktop"}', '{"coreRequest":"customer lookup","customerId":"CUST-2701"}', '{"status":"OK","records":1}', '{"status":"SUCCESS","message":"Customer found"}', 12, 36, 48, '2026-04-27 08:04:12'),
+  ('CORR-20260427-2702', 'MOB-APR-27-02', 'BalanceInquiry', 'MobileBanking', 'SUCCESS', '200', '{"accountId":"ACC-2702","request":"balance"}', '{"entryChannel":"MOBILE","device":"ios"}', '{"coreRequest":"balance inquiry","accountId":"ACC-2702"}', '{"status":"OK","balance":420.18}', '{"status":"SUCCESS","balance":420.18}', 10, 44, 54, '2026-04-27 08:26:47'),
+  ('CORR-20260427-2703', 'API-APR-27-03', 'FundTransfer', 'PartnerGateway', 'SUCCESS', '200', '{"from":"ACC-2703","to":"ACC-3703","amount":125.50}', '{"entryChannel":"PARTNER","partner":"wallet-plus"}', '{"coreRequest":"fund transfer","amount":125.50}', '{"status":"OK","txnId":"TXN-2703"}', '{"status":"SUCCESS","txnId":"TXN-2703"}', 24, 119, 143, '2026-04-27 09:03:51'),
+  ('CORR-20260427-2704', 'ATM-APR-27-04', 'CardActivation', 'ATMNetwork', 'FAILURE', '400', '{"cardId":"CARD-2704","request":"activate"}', '{"entryChannel":"ATM","terminal":"ATM-274"}', '{"coreRequest":"card activation","cardId":"CARD-2704"}', '{"status":"FAILED","code":"CARD_LOCKED"}', '{"status":"ERROR","message":"Card locked"}', 18, 91, 109, '2026-04-27 09:42:08'),
+  ('CORR-20260427-2705', 'WEB-APR-27-05', 'LoanStatus', 'RetailPortal', 'SUCCESS', '200', '{"loanId":"LN-2705"}', '{"entryChannel":"WEB","device":"desktop"}', '{"coreRequest":"loan status","loanId":"LN-2705"}', '{"status":"OK","stage":"APPROVED"}', '{"status":"SUCCESS","stage":"APPROVED"}', 16, 52, 68, '2026-04-27 10:11:29'),
+  ('CORR-20260427-2706', 'MOB-APR-27-06', 'StatementDownload', 'MobileBanking', 'SUCCESS', '200', '{"accountId":"ACC-2706","month":"2026-04"}', '{"entryChannel":"MOBILE","device":"android"}', '{"coreRequest":"statement generation","accountId":"ACC-2706"}', '{"status":"OK","pages":5}', '{"status":"SUCCESS","file":"statement-2706.pdf"}', 26, 282, 308, '2026-04-27 10:39:44'),
+  ('CORR-20260427-2707', 'BRN-APR-27-07', 'CustomerProfileUpdate', 'BranchDesk', 'FAILURE', '500', '{"customerId":"CUST-2707","segment":"PRIORITY"}', '{"entryChannel":"BRANCH","operator":"OP-2707"}', '{"coreRequest":"profile update","customerId":"CUST-2707"}', '{"status":"FAILED","code":"CORE_UNAVAILABLE"}', '{"status":"ERROR","message":"Core profile service unavailable"}', 22, 764, 786, '2026-04-27 11:07:13'),
+  ('CORR-20260427-2708', 'API-APR-27-08', 'PaymentValidation', 'PartnerGateway', 'SUCCESS', '200', '{"paymentId":"PAY-2708","amount":73.25}', '{"entryChannel":"PARTNER","partner":"biller-y"}', '{"coreRequest":"payment validation","paymentId":"PAY-2708"}', '{"status":"OK","validated":true}', '{"status":"SUCCESS","message":"Payment accepted"}', 15, 66, 81, '2026-04-27 11:34:56');

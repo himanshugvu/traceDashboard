@@ -91,7 +91,7 @@ public final class TraceSpecifications {
         if (isBlank(value)) {
             return null;
         }
-        var normalized = value.trim();
+        var normalized = normalizeHttpSeries(value);
         return (root, query, builder) -> builder.equal(root.get("httpSeries"), normalized);
     }
 
@@ -134,5 +134,13 @@ public final class TraceSpecifications {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private static String normalizeHttpSeries(String value) {
+        var normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (normalized.matches("[245]xx")) {
+            return normalized.charAt(0) + "00";
+        }
+        return value.trim();
     }
 }

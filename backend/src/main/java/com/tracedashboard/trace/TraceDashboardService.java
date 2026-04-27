@@ -11,12 +11,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
-import java.util.Set;
-import java.util.TreeSet;
 
 @Service
 public class TraceDashboardService {
@@ -29,33 +25,32 @@ public class TraceDashboardService {
         this.overviewCacheService = overviewCacheService;
     }
 
-    public TraceDtos.DashboardResponse getDashboard(LocalDate day) {
+    public TraceDtos.DashboardResponse getDashboard(LocalDate day, int page, int size) {
         var start = day.atStartOfDay();
         var end = day.plusDays(1).atStartOfDay();
-        var records = repository.findAll(TraceSpecifications.requestTimestampBetween(start, end));
-        var grouped = records.stream()
-            .collect(java.util.stream.Collectors.groupingBy(record -> new ApiKey(record.getApiName(), record.getAppName())));
-
-        var rows = grouped.entrySet().stream()
-            .map((entry) -> toApiSummaryRow(entry.getKey(), entry.getValue()))
-            .sorted(Comparator.comparingLong(TraceDtos.ApiSummaryRow::traceCount).reversed()
-                .thenComparing(TraceDtos.ApiSummaryRow::apiName, Comparator.nullsLast(String::compareTo))
-                .thenComparing(TraceDtos.ApiSummaryRow::appName, Comparator.nullsLast(String::compareTo)))
+        var pageable = PageRequest.of(
+            Math.max(page, 0),
+            Math.max(1, Math.min(size, 200))
+        );
+        var kpis = repository.findDailyDashboardKpis(start, end);
+        var summaryPage = repository.findDailyApiSummaries(start, end, pageable);
+        var rows = summaryPage.getContent().stream()
+            .map(this::toApiSummaryRow)
             .toList();
-
-        long totalTraces = rows.stream().mapToLong(TraceDtos.ApiSummaryRow::traceCount).sum();
-        long uniqueApis = rows.stream().map(TraceDtos.ApiSummaryRow::apiName).filter(Objects::nonNull).distinct().count();
-        long uniqueApps = rows.stream().map(TraceDtos.ApiSummaryRow::appName).filter(Objects::nonNull).distinct().count();
-        var latest = rows.stream()
-            .map(TraceDtos.ApiSummaryRow::latestRequestTimestamp)
-            .filter(Objects::nonNull)
-            .max(Comparator.naturalOrder())
-            .orElse(null);
 
         return new TraceDtos.DashboardResponse(
             day.toString(),
             Instant.now().toString(),
-            new TraceDtos.DashboardKpis(totalTraces, uniqueApis, uniqueApps, latest),
+            new TraceDtos.DashboardKpis(
+                kpis == null ? 0L : longValue(kpis.getTotalRequests()),
+                kpis == null ? 0L : longValue(kpis.getUniqueApis()),
+                kpis == null ? 0L : longValue(kpis.getUniqueApps()),
+                kpis == null ? null : kpis.getLatestRequestTimestamp()
+            ),
+            summaryPage.getTotalElements(),
+            summaryPage.getTotalPages(),
+            summaryPage.getNumber(),
+            summaryPage.getSize(),
             rows
         );
     }
@@ -72,6 +67,34 @@ public class TraceDashboardService {
 
     public TraceDtos.TraceOverviewResponse getTraceOverview(LocalDate day, String apiName, String appName) {
         return overviewCacheService.getOverview(day, appName, apiName);
+    }
+
+    public TraceDtos.TraceScopeSearchResponse searchScopeOptions(
+        LocalDate day,
+        String query,
+        int page,
+        int size
+    ) {
+        var start = day.atStartOfDay();
+        var end = day.plusDays(1).atStartOfDay();
+        var pageable = PageRequest.of(
+            Math.max(page, 0),
+            Math.max(1, Math.min(size, 50)),
+            Sort.by(Sort.Order.asc("appName"), Sort.Order.asc("apiName"))
+        );
+        var optionPage = repository.findScopeOptions(start, end, normalizeLikeQuery(query), pageable);
+        var rows = optionPage.getContent().stream()
+            .map(option -> new TraceDtos.TraceScopeOption(option.getAppName(), option.getApiName()))
+            .toList();
+        return new TraceDtos.TraceScopeSearchResponse(
+            day.toString(),
+            Instant.now().toString(),
+            optionPage.getTotalElements(),
+            optionPage.getTotalPages(),
+            optionPage.getNumber(),
+            optionPage.getSize(),
+            rows
+        );
     }
 
     public TraceDtos.TraceSearchResponse search(
@@ -147,6 +170,7 @@ public class TraceDashboardService {
             record.getRequestTimestamp(),
             determineStatus(record),
             determineHttpSeries(record),
+            determineHttpStatusCode(record),
             record.getRequestReceivedLatencyMs(),
             record.getExternalLatencyMs(),
             record.getTotalLatencyMs()
@@ -195,40 +219,25 @@ public class TraceDashboardService {
         return specification;
     }
 
-    private TraceDtos.ApiSummaryRow toApiSummaryRow(ApiKey key, List<TraceRecord> records) {
-        long total = records.size();
-        long failures = records.stream().filter(this::isFailure).count();
-        long success = total - failures;
-        long retriable = records.stream().filter(this::isRetriable).count();
+    private TraceDtos.ApiSummaryRow toApiSummaryRow(TraceDashboardRepository.DailyApiSummaryProjection row) {
+        long total = row.getTraceCount();
+        long success = row.getSuccessCount();
+        long failures = row.getFailureCount();
+        long retriable = row.getRetriableCount();
         double successRate = total == 0 ? 0.0 : round2((success * 100.0) / total);
-        var latest = records.stream()
-            .map(TraceRecord::getRequestTimestamp)
-            .filter(Objects::nonNull)
-            .max(Comparator.naturalOrder())
-            .orElse(null);
-        Set<String> channels = new TreeSet<>();
-        Set<String> correlations = new TreeSet<>();
-        for (var record : records) {
-            if (record.getChannelId() != null && !record.getChannelId().isBlank()) {
-                channels.add(record.getChannelId());
-            }
-            if (record.getCorrelationId() != null && !record.getCorrelationId().isBlank()) {
-                correlations.add(record.getCorrelationId());
-            }
-        }
         return new TraceDtos.ApiSummaryRow(
-            key.apiName(),
-            key.appName(),
+            row.getApiName(),
+            row.getAppName(),
             total,
             success,
             failures,
             retriable,
             successRate,
             determineApiStatus(total, failures),
-            averageLatency(records),
-            channels.size(),
-            correlations.size(),
-            latest
+            round2(row.getAverageTotalLatencyMs()),
+            row.getUniqueChannels(),
+            row.getUniqueCorrelations(),
+            row.getLatestRequestTimestamp()
         );
     }
 
@@ -242,6 +251,7 @@ public class TraceDashboardService {
             record.getRequestTimestamp(),
             determineStatus(record),
             determineHttpSeries(record),
+            determineHttpStatusCode(record),
             record.getRequestReceivedLatencyMs(),
             record.getExternalLatencyMs(),
             record.getTotalLatencyMs()
@@ -250,6 +260,13 @@ public class TraceDashboardService {
 
     private String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String normalizeLikeQuery(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return "%" + value.trim().toLowerCase(Locale.ROOT) + "%";
     }
 
     private Specification<TraceRecord> andIfPresent(
@@ -281,6 +298,40 @@ public class TraceDashboardService {
         return "400";
     }
 
+    private Integer determineHttpStatusCode(TraceRecord record) {
+        if (record.getHttpStatusCode() != null) {
+            return record.getHttpStatusCode();
+        }
+        var response = ((record.getCoreResponse() == null ? "" : record.getCoreResponse()) + " "
+            + (record.getChannelResponse() == null ? "" : record.getChannelResponse())).toLowerCase(Locale.ROOT);
+        if (matchesStatusCode(response, 503)) {
+            return 503;
+        }
+        if (matchesStatusCode(response, 502)) {
+            return 502;
+        }
+        if (matchesStatusCode(response, 500)) {
+            return 500;
+        }
+        if (matchesStatusCode(response, 404)) {
+            return 404;
+        }
+        if (matchesStatusCode(response, 403)) {
+            return 403;
+        }
+        if (matchesStatusCode(response, 401)) {
+            return 401;
+        }
+        if (matchesStatusCode(response, 400)) {
+            return 400;
+        }
+        return switch (determineHttpSeries(record)) {
+            case "500" -> 500;
+            case "400" -> 404;
+            default -> 200;
+        };
+    }
+
     private boolean isFailure(TraceRecord record) {
         return "FAILURE".equals(determineStatus(record));
     }
@@ -310,19 +361,6 @@ public class TraceDashboardService {
         return "CRITICAL";
     }
 
-    private Double averageLatency(List<TraceRecord> records) {
-        return records.stream()
-            .map(TraceRecord::getTotalLatencyMs)
-            .filter(Objects::nonNull)
-            .mapToInt(Integer::intValue)
-            .average()
-            .stream()
-            .map(this::round2)
-            .boxed()
-            .findFirst()
-            .orElse(0.0);
-    }
-
     private boolean containsAny(String value, String... needles) {
         for (var needle : needles) {
             if (value.contains(needle)) {
@@ -332,8 +370,16 @@ public class TraceDashboardService {
         return false;
     }
 
+    private boolean matchesStatusCode(String value, int statusCode) {
+        return value.matches(".*(^|[^0-9])" + statusCode + "([^0-9]|$).*");
+    }
+
     private double round2(double value) {
         return Math.round(value * 100.0) / 100.0;
+    }
+
+    private Double round2(Double value) {
+        return value == null ? 0.0 : round2(value.doubleValue());
     }
 
     private boolean canUseCachedOverview(
@@ -365,6 +411,7 @@ public class TraceDashboardService {
         return value == null || value.isBlank();
     }
 
-    private record ApiKey(String apiName, String appName) {
+    private long longValue(Long value) {
+        return value == null ? 0L : value;
     }
 }

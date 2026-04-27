@@ -24,6 +24,10 @@ export type DashboardResponse = {
   day: string;
   generatedAt: string;
   kpis: DashboardKpis;
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  size: number;
   rows: ApiSummaryRow[];
 };
 
@@ -52,7 +56,16 @@ export type TraceOverviewResponse = {
   maxExternalLatencyMs: number | null;
   averageTotalLatencyMs: number | null;
   maxTotalLatencyMs: number | null;
-  scopeOptions: TraceScopeOption[];
+};
+
+export type TraceScopeSearchResponse = {
+  day: string;
+  generatedAt: string;
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  size: number;
+  rows: TraceScopeOption[];
 };
 
 export type TraceRow = {
@@ -64,6 +77,7 @@ export type TraceRow = {
   requestTimestamp: string | null;
   status: string | null;
   httpSeries: string | null;
+  httpStatusCode: number | null;
   requestReceivedLatencyMs: number | null;
   externalLatencyMs: number | null;
   totalLatencyMs: number | null;
@@ -102,6 +116,7 @@ export type TraceDetailResponse = {
   requestTimestamp: string | null;
   status: string | null;
   httpSeries: string | null;
+  httpStatusCode: number | null;
   requestReceivedLatencyMs: number | null;
   externalLatencyMs: number | null;
   totalLatencyMs: number | null;

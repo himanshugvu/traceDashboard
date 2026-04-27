@@ -1,0 +1,33 @@
+INSERT INTO trace_record (
+  correlation_id,
+  channel_id,
+  api_name,
+  app_name,
+  status,
+  http_series,
+  request_payload,
+  channel_payload,
+  core_payload,
+  core_response,
+  channel_response,
+  request_received_latency_ms,
+  external_latency_ms,
+  total_latency_ms,
+  requesttimestamp
+) VALUES (
+  'CORR-20260427-50301',
+  'API-503-01',
+  'PaymentValidation',
+  'PartnerGateway',
+  'FAILURE',
+  '500',
+  '{"requestId":"REQ-50301","customerId":"CUST-50301","amount":503.00}',
+  '{"entryChannel":"PARTNER","partner":"gateway-503"}',
+  '{"coreRequest":"payment validation","account":"ACC-50301"}',
+  '{"status":"FAILED","code":"503","message":"Service Unavailable"}',
+  '{"status":"ERROR","httpStatus":503,"message":"503 Service Unavailable"}',
+  31,
+  503,
+  534,
+  '2026-04-27 22:48:15'
+);

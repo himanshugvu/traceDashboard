@@ -27,9 +27,11 @@ public class TraceDashboardController {
 
     @GetMapping("/dashboard")
     public TraceDtos.DashboardResponse getDashboard(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "25") @Min(1) @Max(200) int size
     ) {
-        return service.getDashboard(date);
+        return service.getDashboard(date, page, size);
     }
 
     @GetMapping("/traces/filters")
@@ -48,6 +50,16 @@ public class TraceDashboardController {
         @RequestParam(required = false) String appName
     ) {
         return service.getTraceOverview(date, apiName, appName);
+    }
+
+    @GetMapping("/traces/scopes")
+    public TraceDtos.TraceScopeSearchResponse searchTraceScopes(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) String query,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "25") @Min(1) @Max(50) int size
+    ) {
+        return service.searchScopeOptions(date, query, page, size);
     }
 
     @GetMapping("/traces")

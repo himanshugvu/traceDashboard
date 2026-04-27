@@ -584,10 +584,14 @@ th {
 
 .trace-toolbar-date-input {
   position: absolute;
-  width: 0;
-  height: 0;
+  inset: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+.trace-toolbar-date-input input {
+  width: 100%;
+  height: 100%;
 }
 
 .theme-toggle {
@@ -1474,6 +1478,13 @@ th {
   justify-content: space-between;
 }
 
+.trace-header-date-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
 .trace-header-scope-field {
   position: relative;
   flex: 0 1 260px;
@@ -1645,10 +1656,10 @@ th {
 
 .trace-observability-filterbar {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 88px;
-  gap: 8px;
-  align-items: start;
-  padding: 10px 12px;
+  grid-template-columns: 164px minmax(0, 1fr) 112px;
+  gap: 14px;
+  align-items: center;
+  padding: 8px 14px;
   border: 0;
   border-radius: 16px;
   background: #1d2538;
@@ -1673,64 +1684,87 @@ th {
   color: #8fa0b6;
 }
 
-.trace-filter-status-block,
-.trace-filter-slider-block,
-.trace-filter-mode-block {
-  display: grid;
-  gap: 4px;
+.trace-filter-builder-block {
+  display: block;
+  min-width: 0;
 }
 
-.trace-filter-builder-block {
-  display: grid;
-  gap: 4px;
+.trace-filter-status-block {
+  display: flex;
+  align-items: center;
   min-width: 0;
 }
 
 .trace-filter-builder {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(132, 147, 150, 0.1);
+  border-radius: 16px;
+  background: rgba(14, 22, 39, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.trace-filter-mode-select {
+  display: block;
+  flex: 0 0 210px;
+  min-width: 210px;
+}
+
+.trace-filter-mode-select > span {
+  display: none;
+}
+
+.trace-filter-mode-input {
+  min-height: 38px;
+  font-weight: 700;
+  padding-right: 32px;
+}
+
+.trace-filter-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
-  align-items: flex-start;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-.trace-query-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 420px;
+.trace-filter-inputs.preset-correlationChannel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.trace-filter-inline-field {
+  display: block;
   min-width: 0;
 }
 
-.trace-query-join {
-  flex: 0 0 auto;
-  min-width: 34px;
-  padding: 0 8px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: rgba(132, 147, 150, 0.08);
-  color: #8fa0b6;
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.trace-filter-inline-field > span {
+  display: none;
 }
 
 .trace-query-clause {
   display: grid;
-  grid-template-columns: 138px 74px minmax(150px, 1fr) 28px;
+  grid-template-columns: 176px 52px minmax(180px, 1fr) 30px;
   align-items: center;
   gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
-  padding: 6px;
-  border: 1px solid rgba(132, 147, 150, 0.12);
-  border-radius: 14px;
+  min-height: 48px;
+  padding: 5px;
+  border: 1px solid rgba(132, 147, 150, 0.14);
+  border-radius: 13px;
   background: linear-gradient(180deg, rgba(17, 25, 42, 0.96), rgba(14, 22, 39, 0.94));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.trace-query-clause.compact {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 38px;
+  padding: 3px;
+  border-radius: 12px;
 }
 
 .trace-query-clause:focus-within {
@@ -1742,13 +1776,14 @@ th {
 .trace-query-input {
   width: 100%;
   min-width: 0;
-  min-height: 34px;
+  min-height: 30px;
   padding: 0 11px;
   border: 1px solid rgba(132, 147, 150, 0.12);
   border-radius: 9px;
   background: #0e1627;
   color: #e4ebfb;
-  font-size: 0.73rem;
+  font-size: 0.72rem;
+  line-height: 1;
 }
 
 .trace-query-select {
@@ -1766,43 +1801,19 @@ th {
 }
 
 .trace-query-remove {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 8px;
   background: rgba(132, 147, 150, 0.1);
   color: #aab6ca;
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
 .trace-query-remove:hover {
   background: rgba(255, 143, 143, 0.14);
   color: #ffb4ab;
-}
-
-.trace-add-filter-button {
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px dashed rgba(132, 147, 150, 0.22);
-  border-radius: 12px;
-  background: rgba(14, 22, 39, 0.4);
-  color: #9fb0c8;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  align-self: center;
-}
-
-.trace-add-filter-button:hover:not(:disabled) {
-  border-color: rgba(127, 222, 246, 0.24);
-  color: #d8f7ff;
-}
-
-.trace-add-filter-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .trace-filter-block.inline,
@@ -1815,7 +1826,9 @@ th {
 
 .trace-status-toggle {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 44px);
+  min-width: 148px;
+  width: max-content;
   gap: 4px;
   padding: 4px;
   border-radius: 10px;
@@ -1823,9 +1836,10 @@ th {
 }
 
 .trace-status-button {
-  min-width: 0;
-  min-height: 32px;
-  padding: 0 8px;
+  min-width: 44px;
+  white-space: nowrap;
+  min-height: 30px;
+  padding: 0 6px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -2057,6 +2071,7 @@ th {
 
 .trace-clear-button,
 .trace-apply-button,
+.trace-action-button,
 .trace-page-button {
   border: 1px solid var(--border);
   font-weight: 800;
@@ -2069,18 +2084,36 @@ th {
   color: var(--text);
 }
 
-.trace-apply-button {
-  min-width: 96px;
-  width: auto;
-  min-height: 46px;
-  padding: 0 16px;
+.trace-action-button {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  align-self: center;
+}
+
+.trace-action-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trace-action-button.clear {
+  background: color-mix(in srgb, var(--chip-bg) 96%, transparent);
+  color: var(--text-muted);
+}
+
+.trace-action-button.search {
   background: linear-gradient(135deg, #19c8df, #22d3ee);
   color: #04111a;
   border-color: transparent;
-  font-size: 0.71rem;
-  letter-spacing: 0.04em;
-  border-radius: 14px;
-  align-self: center;
 }
 
 .trace-scope-select-menu {
@@ -2110,6 +2143,19 @@ th {
   padding: 9px 10px;
   border-radius: 10px;
   font-size: 0.76rem;
+}
+
+.scope-option-more {
+  margin-top: 6px;
+  border: 1px dashed rgba(132, 147, 150, 0.2);
+  background: rgba(14, 22, 39, 0.45);
+  color: #cfe5ff;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.scope-option-more:hover {
+  background: rgba(0, 218, 243, 0.12);
 }
 
 .trace-observability-table {
@@ -2471,8 +2517,20 @@ th {
   border-color: rgba(175, 179, 174, 0.28);
 }
 
+.app-shell.theme-light .trace-filter-mode-input {
+  background: #ffffff;
+  border-color: rgba(175, 179, 174, 0.22);
+  color: #2f3430;
+}
+
 .app-shell.theme-light .trace-query-select,
 .app-shell.theme-light .trace-query-input {
+  background: #ffffff;
+  border-color: rgba(175, 179, 174, 0.22);
+  color: #2f3430;
+}
+
+.app-shell.theme-light .trace-filter-preset-select {
   background: #ffffff;
   border-color: rgba(175, 179, 174, 0.22);
   color: #2f3430;
@@ -2484,12 +2542,6 @@ th {
 
 .app-shell.theme-light .trace-query-remove {
   background: rgba(175, 179, 174, 0.12);
-  color: #777c77;
-}
-
-.app-shell.theme-light .trace-add-filter-button {
-  background: rgba(255, 255, 255, 0.68);
-  border-color: rgba(175, 179, 174, 0.36);
   color: #777c77;
 }
 
@@ -2580,6 +2632,16 @@ th {
 .app-shell.theme-light .scope-option.active {
   background: rgba(255, 223, 160, 0.36);
   color: #2f3430;
+}
+
+.app-shell.theme-light .scope-option-more {
+  border-color: rgba(175, 179, 174, 0.34);
+  background: rgba(255, 255, 255, 0.88);
+  color: #795900;
+}
+
+.app-shell.theme-light .scope-option-more:hover {
+  background: rgba(255, 223, 160, 0.36);
 }
 
 .app-shell.theme-light .trace-observability-table {
@@ -2725,6 +2787,19 @@ th {
 
   .trace-query-clause {
     grid-template-columns: 1fr 72px minmax(120px, 1fr) 28px;
+  }
+
+  .trace-filter-builder {
+    flex-wrap: wrap;
+  }
+
+  .trace-filter-mode-select {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .trace-filter-inputs.preset-correlationChannel {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .payload-grid.e2e {

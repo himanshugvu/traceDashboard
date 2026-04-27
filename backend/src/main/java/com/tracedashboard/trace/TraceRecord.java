@@ -35,6 +35,9 @@ public class TraceRecord {
     @Column(name = "http_series")
     private String httpSeries;
 
+    @Column(name = "http_status_code")
+    private Integer httpStatusCode;
+
     @Column(name = "request_payload", columnDefinition = "LONGTEXT")
     private String requestPayload;
 
@@ -91,6 +94,10 @@ public class TraceRecord {
 
     public String getHttpSeries() {
         return httpSeries;
+    }
+
+    public Integer getHttpStatusCode() {
+        return httpStatusCode;
     }
 
     public String getRequestPayload() {

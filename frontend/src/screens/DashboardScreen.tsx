@@ -58,13 +58,18 @@ export function DashboardScreen({ day, onDayChange, onOpenLogs }: DashboardScree
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    setPage(0);
+  }, [day]);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    fetchJson<DashboardResponse>(`/api/v1/dashboard?date=${day}&refreshToken=${refreshToken}`, controller.signal)
+    fetchJson<DashboardResponse>(`/api/v1/dashboard?date=${day}&page=${page}&size=25&refreshToken=${refreshToken}`, controller.signal)
       .then(setData)
       .catch((nextError) => {
         if (!controller.signal.aborted) {
@@ -78,9 +83,12 @@ export function DashboardScreen({ day, onDayChange, onOpenLogs }: DashboardScree
       });
 
     return () => controller.abort();
-  }, [day, refreshToken]);
+  }, [day, page, refreshToken]);
 
   const rows = data?.rows ?? [];
+  const totalPages = data?.totalPages ?? 0;
+  const canPrev = page > 0;
+  const canNext = page + 1 < totalPages;
   const totalSuccess = rows.reduce((sum, row) => sum + (row.successCount ?? 0), 0);
   const totalFailures = rows.reduce((sum, row) => sum + (row.failureCount ?? 0), 0);
   const successRate = (data?.kpis.totalTraces ?? 0) === 0 ? 0 : (totalSuccess * 100) / (data?.kpis.totalTraces ?? 0);
@@ -193,6 +201,29 @@ export function DashboardScreen({ day, onDayChange, onOpenLogs }: DashboardScree
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="trace-observability-footer">
+          <span>
+            {loading
+              ? "Refreshing dashboard..."
+              : `Showing ${rows.length} rows on this page | ${formatNumber(data?.totalElements ?? 0)} total scope rows`}
+          </span>
+          <div className="trace-footer-pager">
+            <button className="trace-page-button" type="button" onClick={() => setPage(0)} disabled={!canPrev}>
+              First
+            </button>
+            <button className="trace-page-button" type="button" onClick={() => setPage((value) => value - 1)} disabled={!canPrev}>
+              Prev
+            </button>
+            <span className="trace-page-indicator">{Math.min((data?.page ?? 0) + 1, Math.max(totalPages, 1))}</span>
+            <button className="trace-page-button" type="button" onClick={() => setPage((value) => value + 1)} disabled={!canNext}>
+              Next
+            </button>
+            <button className="trace-page-button" type="button" onClick={() => setPage(Math.max(totalPages - 1, 0))} disabled={!canNext}>
+              Last
+            </button>
+          </div>
         </div>
       </div>
     </section>
