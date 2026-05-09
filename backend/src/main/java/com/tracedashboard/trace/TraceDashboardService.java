@@ -25,9 +25,40 @@ public class TraceDashboardService {
         this.overviewCacheService = overviewCacheService;
     }
 
+    public record DateRange(LocalDate from, LocalDate to) {
+    }
+
+    public DateRange resolveDateRange(LocalDate date, LocalDate dateFrom, LocalDate dateTo) {
+        if (dateFrom != null || dateTo != null) {
+            if (dateFrom == null || dateTo == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateFrom and dateTo must be provided together");
+            }
+            if (dateTo.isBefore(dateFrom)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateTo must be >= dateFrom");
+            }
+            return new DateRange(dateFrom, dateTo);
+        }
+        if (date == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "date is required");
+        }
+        return new DateRange(date, date);
+    }
+
+    private LocalDateTime rangeStart(LocalDate from) {
+        return from.atStartOfDay();
+    }
+
+    private LocalDateTime rangeEndExclusive(LocalDate to) {
+        return to.plusDays(1).atStartOfDay();
+    }
+
     public TraceDtos.DashboardResponse getDashboard(LocalDate day, int page, int size) {
-        var start = day.atStartOfDay();
-        var end = day.plusDays(1).atStartOfDay();
+        return getDashboard(day, day, page, size);
+    }
+
+    public TraceDtos.DashboardResponse getDashboard(LocalDate fromDay, LocalDate toDay, int page, int size) {
+        var start = rangeStart(fromDay);
+        var end = rangeEndExclusive(toDay);
         var pageable = PageRequest.of(
             Math.max(page, 0),
             Math.max(1, Math.min(size, 200))
@@ -39,7 +70,7 @@ public class TraceDashboardService {
             .toList();
 
         return new TraceDtos.DashboardResponse(
-            day.toString(),
+            fromDay.toString(),
             Instant.now().toString(),
             new TraceDtos.DashboardKpis(
                 kpis == null ? 0L : longValue(kpis.getTotalRequests()),
@@ -56,8 +87,12 @@ public class TraceDashboardService {
     }
 
     public TraceDtos.TraceFiltersResponse getFilters(LocalDate day, String apiName, String appName) {
-        var start = day.atStartOfDay();
-        var end = day.plusDays(1).atStartOfDay();
+        return getFilters(day, day, apiName, appName);
+    }
+
+    public TraceDtos.TraceFiltersResponse getFilters(LocalDate fromDay, LocalDate toDay, String apiName, String appName) {
+        var start = rangeStart(fromDay);
+        var end = rangeEndExclusive(toDay);
         return new TraceDtos.TraceFiltersResponse(
             repository.findDistinctApiNames(start, end),
             repository.findDistinctAppNames(start, end, normalizeBlank(apiName)),
@@ -66,7 +101,50 @@ public class TraceDashboardService {
     }
 
     public TraceDtos.TraceOverviewResponse getTraceOverview(LocalDate day, String apiName, String appName) {
-        return overviewCacheService.getOverview(day, appName, apiName);
+        return getTraceOverview(day, day, apiName, appName);
+    }
+
+    public TraceDtos.TraceOverviewResponse getTraceOverview(LocalDate fromDay, LocalDate toDay, String apiName, String appName) {
+        if (fromDay.equals(toDay)) {
+            return overviewCacheService.getOverview(fromDay, appName, apiName);
+        }
+        var start = rangeStart(fromDay);
+        var end = rangeEndExclusive(toDay);
+        var normalizedAppName = normalizeBlank(appName);
+        var normalizedApiName = normalizeBlank(apiName);
+        var overview = repository.findScopedOverview(start, end, normalizedAppName, normalizedApiName);
+        if (overview == null) {
+            return new TraceDtos.TraceOverviewResponse(
+                fromDay.toString(),
+                Instant.now().toString(),
+                normalizedAppName == null ? "" : normalizedAppName,
+                normalizedApiName == null ? "" : normalizedApiName,
+                0L,
+                0L,
+                0L,
+                0.0,
+                0,
+                0.0,
+                0,
+                0.0,
+                0
+            );
+        }
+        return new TraceDtos.TraceOverviewResponse(
+            fromDay.toString(),
+            Instant.now().toString(),
+            normalizedAppName == null ? "" : normalizedAppName,
+            normalizedApiName == null ? "" : normalizedApiName,
+            longValue(overview.getTotalRequests()),
+            longValue(overview.getSuccessCount()),
+            longValue(overview.getFailureCount()),
+            round2(overview.getAverageReceivedLatencyMs()),
+            overview.getMaxReceivedLatencyMs() == null ? 0 : overview.getMaxReceivedLatencyMs(),
+            round2(overview.getAverageExternalLatencyMs()),
+            overview.getMaxExternalLatencyMs() == null ? 0 : overview.getMaxExternalLatencyMs(),
+            round2(overview.getAverageTotalLatencyMs()),
+            overview.getMaxTotalLatencyMs() == null ? 0 : overview.getMaxTotalLatencyMs()
+        );
     }
 
     public TraceDtos.TraceScopeSearchResponse searchScopeOptions(
@@ -75,8 +153,18 @@ public class TraceDashboardService {
         int page,
         int size
     ) {
-        var start = day.atStartOfDay();
-        var end = day.plusDays(1).atStartOfDay();
+        return searchScopeOptions(day, day, query, page, size);
+    }
+
+    public TraceDtos.TraceScopeSearchResponse searchScopeOptions(
+        LocalDate fromDay,
+        LocalDate toDay,
+        String query,
+        int page,
+        int size
+    ) {
+        var start = rangeStart(fromDay);
+        var end = rangeEndExclusive(toDay);
         var pageable = PageRequest.of(
             Math.max(page, 0),
             Math.max(1, Math.min(size, 50)),
@@ -87,7 +175,7 @@ public class TraceDashboardService {
             .map(option -> new TraceDtos.TraceScopeOption(option.getAppName(), option.getApiName()))
             .toList();
         return new TraceDtos.TraceScopeSearchResponse(
-            day.toString(),
+            fromDay.toString(),
             Instant.now().toString(),
             optionPage.getTotalElements(),
             optionPage.getTotalPages(),
@@ -117,11 +205,35 @@ public class TraceDashboardService {
         int page,
         int size
     ) {
-        var baseSpecification = buildSearchSpecification(day, apiName, appName, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to);
+        return search(day, day, apiName, appName, status, httpSeries, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to, page, size);
+    }
+
+    public TraceDtos.TraceSearchResponse search(
+        LocalDate fromDay,
+        LocalDate toDay,
+        String apiName,
+        String appName,
+        String status,
+        String httpSeries,
+        Integer minTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        Integer exactTotalLatencyMs,
+        String correlationId,
+        String channelId,
+        String accountQuery,
+        String customerQuery,
+        String payloadQuery,
+        String globalQuery,
+        LocalDateTime from,
+        LocalDateTime to,
+        int page,
+        int size
+    ) {
+        var baseSpecification = buildSearchSpecification(fromDay, toDay, apiName, appName, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to);
         var querySpecification = andIfPresent(baseSpecification, TraceSpecifications.statusEquals(status));
         querySpecification = andIfPresent(querySpecification, TraceSpecifications.httpSeriesEquals(httpSeries));
-        var cachedOverview = canUseCachedOverview(day, apiName, appName, correlationId, channelId, payloadQuery, globalQuery, from, to)
-            ? overviewCacheService.findCachedOverview(day, appName, apiName)
+        var cachedOverview = canUseCachedOverview(fromDay, toDay, apiName, appName, correlationId, channelId, payloadQuery, globalQuery, from, to)
+            ? overviewCacheService.findCachedOverview(fromDay, appName, apiName)
             : null;
 
         var pageable = PageRequest.of(
@@ -133,7 +245,7 @@ public class TraceDashboardService {
         var rows = tracePage.getContent().stream().map(this::toTraceRow).toList();
 
         return new TraceDtos.TraceSearchResponse(
-            day.toString(),
+            fromDay.toString(),
             Instant.now().toString(),
             cachedOverview == null ? 0 : cachedOverview.totalRequests(),
             cachedOverview == null ? 0 : cachedOverview.successCount(),
@@ -160,6 +272,7 @@ public class TraceDashboardService {
             record.getId(),
             record.getCorrelationId(),
             record.getChannelId(),
+            record.getAccountNumber(),
             record.getApiName(),
             record.getAppName(),
             record.getRequestPayload(),
@@ -193,8 +306,28 @@ public class TraceDashboardService {
         LocalDateTime from,
         LocalDateTime to
     ) {
-        var dayStart = day.atStartOfDay();
-        var dayEnd = day.plusDays(1).atStartOfDay();
+        return buildSearchSpecification(day, day, apiName, appName, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to);
+    }
+
+    private Specification<TraceRecord> buildSearchSpecification(
+        LocalDate fromDay,
+        LocalDate toDay,
+        String apiName,
+        String appName,
+        Integer minTotalLatencyMs,
+        Integer maxTotalLatencyMs,
+        Integer exactTotalLatencyMs,
+        String correlationId,
+        String channelId,
+        String accountQuery,
+        String customerQuery,
+        String payloadQuery,
+        String globalQuery,
+        LocalDateTime from,
+        LocalDateTime to
+    ) {
+        var dayStart = rangeStart(fromDay);
+        var dayEnd = rangeEndExclusive(toDay);
         var specification = Specification.where(TraceSpecifications.requestTimestampBetween(dayStart, dayEnd));
 
         specification = andIfPresent(specification, TraceSpecifications.apiNameEquals(apiName));
@@ -246,6 +379,7 @@ public class TraceDashboardService {
             record.getId(),
             record.getCorrelationId(),
             record.getChannelId(),
+            record.getAccountNumber(),
             record.getApiName(),
             record.getAppName(),
             record.getRequestTimestamp(),
@@ -383,7 +517,8 @@ public class TraceDashboardService {
     }
 
     private boolean canUseCachedOverview(
-        LocalDate day,
+        LocalDate fromDay,
+        LocalDate toDay,
         String apiName,
         String appName,
         String correlationId,
@@ -393,11 +528,12 @@ public class TraceDashboardService {
         LocalDateTime from,
         LocalDateTime to
     ) {
-        return isBlank(correlationId)
+        return fromDay.equals(toDay)
+            && isBlank(correlationId)
             && isBlank(channelId)
             && isBlank(payloadQuery)
             && isBlank(globalQuery)
-            && withinDayBounds(day, from, to);
+            && withinDayBounds(fromDay, from, to);
     }
 
     private boolean withinDayBounds(LocalDate day, LocalDateTime from, LocalDateTime to) {

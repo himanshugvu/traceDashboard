@@ -72,6 +72,7 @@ export type TraceRow = {
   id: number;
   correlationId: string | null;
   channelId: string | null;
+  accountNumber: string | null;
   apiName: string | null;
   appName: string | null;
   requestTimestamp: string | null;
@@ -106,6 +107,7 @@ export type TraceDetailResponse = {
   id: number;
   correlationId: string | null;
   channelId: string | null;
+  accountNumber: string | null;
   apiName: string | null;
   appName: string | null;
   requestPayload: string | null;

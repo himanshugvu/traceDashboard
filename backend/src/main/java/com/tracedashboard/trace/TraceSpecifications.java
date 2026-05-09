@@ -117,7 +117,7 @@ public final class TraceSpecifications {
     }
 
     public static Specification<TraceRecord> accountContains(String value) {
-        return payloadContains(value);
+        return containsIgnoreCase("accountNumber", value);
     }
 
     public static Specification<TraceRecord> customerContains(String value) {

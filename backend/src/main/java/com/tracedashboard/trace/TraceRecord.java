@@ -29,6 +29,9 @@ public class TraceRecord {
     @Column(name = "app_name")
     private String appName;
 
+    @Column(name = "account_number")
+    private String accountNumber;
+
     @Column(name = "status")
     private String status;
 
@@ -86,6 +89,10 @@ public class TraceRecord {
 
     public String getAppName() {
         return appName;
+    }
+
+    public String getAccountNumber() {
+        return accountNumber;
     }
 
     public String getStatus() {

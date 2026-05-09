@@ -18,7 +18,8 @@ function readTheme(): ThemeMode {
 function readRoute() {
   const params = new URLSearchParams(window.location.search);
   return {
-    day: params.get("day") || todayIso(),
+    dayFrom: params.get("from") || params.get("day") || todayIso(),
+    dayTo: params.get("to") || params.get("day") || params.get("from") || todayIso(),
     app: params.get("app") || "",
     api: params.get("api") || ""
   };
@@ -26,14 +27,16 @@ function readRoute() {
 
 export default function App() {
   const initialRoute = readRoute();
-  const [day, setDay] = useState(initialRoute.day);
+  const [dayFrom, setDayFrom] = useState(initialRoute.dayFrom);
+  const [dayTo, setDayTo] = useState(initialRoute.dayTo);
   const [selectedAppName, setSelectedAppName] = useState(initialRoute.app);
   const [selectedApiName, setSelectedApiName] = useState(initialRoute.api);
   const [theme, setTheme] = useState<ThemeMode>(() => readTheme());
 
-  function syncRoute(nextDay: string, nextApp: string, nextApi: string) {
+  function syncRoute(nextFrom: string, nextTo: string, nextApp: string, nextApi: string) {
     const params = new URLSearchParams();
-    params.set("day", nextDay);
+    params.set("from", nextFrom);
+    params.set("to", nextTo);
     if (nextApp) {
       params.set("app", nextApp);
     }
@@ -47,7 +50,8 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const route = readRoute();
-      setDay(route.day);
+      setDayFrom(route.dayFrom);
+      setDayTo(route.dayTo);
       setSelectedAppName(route.app);
       setSelectedApiName(route.api);
     };
@@ -68,22 +72,24 @@ export default function App() {
     <div className={`app-shell theme-${theme}`}>
       <main className="main-shell detail-mode">
         <TraceLogsScreen
-          day={day}
+          dayFrom={dayFrom}
+          dayTo={dayTo}
           initialAppName={selectedAppName}
           initialApiName={selectedApiName}
           onBack={() => {
             setSelectedAppName("");
             setSelectedApiName("");
-            syncRoute(day, "", "");
+            syncRoute(dayFrom, dayTo, "", "");
           }}
           onScopeChange={(nextApp, nextApi) => {
             setSelectedAppName(nextApp);
             setSelectedApiName(nextApi);
-            syncRoute(day, nextApp, nextApi);
+            syncRoute(dayFrom, dayTo, nextApp, nextApi);
           }}
-          onDayChange={(nextDay) => {
-            setDay(nextDay);
-            syncRoute(nextDay, selectedAppName, selectedApiName);
+          onDayRangeChange={(nextFrom, nextTo) => {
+            setDayFrom(nextFrom);
+            setDayTo(nextTo);
+            syncRoute(nextFrom, nextTo, selectedAppName, selectedApiName);
           }}
           theme={theme}
           onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}

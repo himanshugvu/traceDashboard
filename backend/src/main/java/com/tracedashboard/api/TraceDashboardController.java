@@ -27,44 +27,58 @@ public class TraceDashboardController {
 
     @GetMapping("/dashboard")
     public TraceDtos.DashboardResponse getDashboard(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "25") @Min(1) @Max(200) int size
     ) {
-        return service.getDashboard(date, page, size);
+        var range = service.resolveDateRange(date, dateFrom, dateTo);
+        return service.getDashboard(range.from(), range.to(), page, size);
     }
 
     @GetMapping("/traces/filters")
     public TraceDtos.TraceFiltersResponse getFilters(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
         @RequestParam(required = false) String apiName,
         @RequestParam(required = false) String appName
     ) {
-        return service.getFilters(date, apiName, appName);
+        var range = service.resolveDateRange(date, dateFrom, dateTo);
+        return service.getFilters(range.from(), range.to(), apiName, appName);
     }
 
     @GetMapping("/traces/overview")
     public TraceDtos.TraceOverviewResponse getTraceOverview(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
         @RequestParam(required = false) String apiName,
         @RequestParam(required = false) String appName
     ) {
-        return service.getTraceOverview(date, apiName, appName);
+        var range = service.resolveDateRange(date, dateFrom, dateTo);
+        return service.getTraceOverview(range.from(), range.to(), apiName, appName);
     }
 
     @GetMapping("/traces/scopes")
     public TraceDtos.TraceScopeSearchResponse searchTraceScopes(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
         @RequestParam(required = false) String query,
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "25") @Min(1) @Max(50) int size
     ) {
-        return service.searchScopeOptions(date, query, page, size);
+        var range = service.resolveDateRange(date, dateFrom, dateTo);
+        return service.searchScopeOptions(range.from(), range.to(), query, page, size);
     }
 
     @GetMapping("/traces")
     public TraceDtos.TraceSearchResponse searchTraces(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
         @RequestParam(required = false) String apiName,
         @RequestParam(required = false) String appName,
         @RequestParam(required = false) String status,
@@ -83,7 +97,8 @@ public class TraceDashboardController {
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size
     ) {
-        return service.search(date, apiName, appName, status, httpSeries, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to, page, size);
+        var range = service.resolveDateRange(date, dateFrom, dateTo);
+        return service.search(range.from(), range.to(), apiName, appName, status, httpSeries, minTotalLatencyMs, maxTotalLatencyMs, exactTotalLatencyMs, correlationId, channelId, accountQuery, customerQuery, payloadQuery, globalQuery, from, to, page, size);
     }
 
     @GetMapping("/traces/{id}")

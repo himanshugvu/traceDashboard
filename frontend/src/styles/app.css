@@ -582,18 +582,6 @@ th {
   justify-content: space-between;
 }
 
-.trace-toolbar-date-input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.trace-toolbar-date-input input {
-  width: 100%;
-  height: 100%;
-}
-
 .theme-toggle {
   border: 0;
   padding: 0;
@@ -1393,6 +1381,7 @@ th {
 .trace-header-path,
 .trace-header-controls,
 .trace-header-day-toggle,
+.trace-header-range,
 .trace-status-toggle,
 .trace-inline-actions,
 .trace-footer-pager {
@@ -1455,6 +1444,84 @@ th {
   gap: 6px;
 }
 
+.trace-header-range {
+  gap: 6px;
+}
+
+.trace-header-range-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.trace-header-range-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 34px 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--chip-bg) 96%, transparent);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+  min-width: 176px;
+  position: relative;
+}
+
+.trace-header-range-button.open {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.trace-header-range-arrow {
+  position: absolute;
+  right: 14px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid color-mix(in srgb, var(--text) 65%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--text) 65%, transparent);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.trace-header-range-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  display: grid;
+  min-width: 176px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: var(--shadow-strong);
+}
+
+.trace-header-range-option {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.trace-header-range-option:hover,
+.trace-header-range-option.active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--chip-bg));
+}
+
+.trace-header-chip-range {
+  min-width: 156px;
+  justify-content: center;
+}
+
 .trace-header-day-button,
 .trace-header-chip {
   min-height: 36px;
@@ -1483,6 +1550,95 @@ th {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
+}
+
+.trace-date-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.trace-date-chips.range-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.trace-date-chips.custom-active {
+  opacity: 1;
+}
+
+.trace-date-input-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+.trace-date-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 36px;
+  min-width: 154px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--chip-bg) 96%, transparent);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.trace-date-trigger-value {
+  letter-spacing: 0.01em;
+}
+
+.trace-date-trigger-icon {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+}
+
+.trace-date-trigger-icon::before {
+  content: "";
+  position: absolute;
+  inset: 2px 1px 1px;
+  border: 2px solid currentColor;
+  border-top-width: 5px;
+  border-radius: 3px;
+}
+
+.trace-date-trigger-icon::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 3px;
+  width: 2px;
+  height: 4px;
+  background: currentColor;
+  box-shadow: 6px 0 0 currentColor;
+}
+
+.trace-date-picker-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.trace-date-input-chip.visible-input input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+.trace-date-input-chip.visible-input input[type="date"]:focus {
+  outline: none;
 }
 
 .trace-header-scope-field {
@@ -1588,7 +1744,7 @@ th {
 
 .trace-observability-kpis {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
 }
 

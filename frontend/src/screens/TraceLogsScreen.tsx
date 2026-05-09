@@ -10,12 +10,13 @@ import type {
 } from "../types";
 
 type TraceLogsScreenProps = {
-  day: string;
+  dayFrom: string;
+  dayTo: string;
   initialAppName: string;
   initialApiName: string;
   onBack: () => void;
   onScopeChange: (appName: string, apiName: string) => void;
-  onDayChange: (day: string) => void;
+  onDayRangeChange: (fromDay: string, toDay: string) => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
   embedded?: boolean;
@@ -31,6 +32,7 @@ type QueryClause = {
   operator: QueryOperator;
   value: string;
 };
+type RangeSelection = "today" | "yesterday" | "lastWeek" | "lastMonth" | "custom";
 
 const FILTER_PRESET_OPTIONS: Array<{ value: FilterPreset; label: string }> = [
   { value: "correlation", label: "Correlation ID" },
@@ -104,7 +106,18 @@ function yesterdayIso() {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-function buildDefaultFilters(day: string, apiName: string, appName: string): TraceFiltersState {
+function daysAgoIso(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function normalizeRange(fromDay: string, toDay: string) {
+  if (toDay < fromDay) {
+    return { fromDay: toDay, toDay: fromDay };
+  }
+  return { fromDay, toDay };
+}
+
+function buildDefaultFilters(fromDay: string, toDay: string, apiName: string, appName: string): TraceFiltersState {
   return {
     apiName,
     appName,
@@ -117,8 +130,8 @@ function buildDefaultFilters(day: string, apiName: string, appName: string): Tra
     minTotalLatencyMs: null,
     maxTotalLatencyMs: null,
     exactTotalLatencyMs: null,
-    from: `${day}T00:00`,
-    to: `${day}T23:59`
+    from: `${fromDay}T00:00`,
+    to: `${toDay}T23:59`
   };
 }
 
@@ -216,8 +229,8 @@ function normalizeLatencyFilter(value: string) {
   return Math.max(0, Math.min(1000, Math.round(parsed)));
 }
 
-function buildFilters(day: string, apiName: string, appName: string, clauses: QueryClause[]) {
-  const next = buildDefaultFilters(day, apiName, appName);
+function buildFilters(fromDay: string, toDay: string, apiName: string, appName: string, clauses: QueryClause[]) {
+  const next = buildDefaultFilters(fromDay, toDay, apiName, appName);
 
   for (const clause of clauses) {
     const value = clause.value.trim();
@@ -257,7 +270,8 @@ function buildFilters(day: string, apiName: string, appName: string, clauses: Qu
 
 function toQueryString(filters: TraceFiltersState, page: number, httpSeries: HttpSeriesFilter) {
   const params = new URLSearchParams();
-  params.set("date", filters.from.slice(0, 10));
+  params.set("dateFrom", filters.from.slice(0, 10));
+  params.set("dateTo", filters.to.slice(0, 10));
   params.set("page", String(page));
   params.set("size", String(PAGE_SIZE));
   params.set("httpSeries", httpSeries);
@@ -330,20 +344,24 @@ function getStatusLabel(httpStatusCode: number | null | undefined, httpSeries: s
 }
 
 export function TraceLogsScreen({
-  day,
+  dayFrom,
+  dayTo,
   initialAppName,
   initialApiName,
   onBack,
   onScopeChange,
-  onDayChange,
+  onDayRangeChange,
   theme,
   onToggleTheme
 }: TraceLogsScreenProps) {
   const sectionRef = useRef<HTMLElement | null>(null);
-  const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const dateFromInputRef = useRef<HTMLInputElement | null>(null);
+  const dateToInputRef = useRef<HTMLInputElement | null>(null);
   const scopeMenuRef = useRef<HTMLDivElement | null>(null);
+  const rangeMenuRef = useRef<HTMLDivElement | null>(null);
   const [errorType, setErrorType] = useState<HttpSeriesFilter>("2xx");
   const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
+  const [rangeMenuOpen, setRangeMenuOpen] = useState(false);
   const [scopeQuery, setScopeQuery] = useState("");
   const [scopePage, setScopePage] = useState(0);
   const [filterPreset, setFilterPreset] = useState<FilterPreset>("correlation");
@@ -351,7 +369,7 @@ export function TraceLogsScreen({
   const [page, setPage] = useState(0);
   const [refreshToken, setRefreshToken] = useState(0);
   const [appliedFilters, setAppliedFilters] = useState<TraceFiltersState>(() =>
-    buildDefaultFilters(day, initialApiName, initialAppName)
+    buildDefaultFilters(dayFrom, dayTo, initialApiName, initialAppName)
   );
   const [overviewData, setOverviewData] = useState<TraceOverviewResponse | null>(null);
   const [scopeData, setScopeData] = useState<TraceScopeSearchResponse | null>(null);
@@ -365,7 +383,7 @@ export function TraceLogsScreen({
   const [detailError, setDetailError] = useState<string | null>(null);
 
   useEffect(() => {
-    setAppliedFilters(buildDefaultFilters(day, initialApiName, initialAppName));
+    setAppliedFilters(buildDefaultFilters(dayFrom, dayTo, initialApiName, initialAppName));
     setFilterPreset("correlation");
     setFilterClauses(createClausesForPreset("correlation"));
     setErrorType("2xx");
@@ -373,18 +391,22 @@ export function TraceLogsScreen({
     setScopeQuery("");
     setScopePage(0);
     setPage(0);
-  }, [day, initialApiName, initialAppName]);
+  }, [dayFrom, dayTo, initialApiName, initialAppName]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       if (!scopeMenuRef.current?.contains(event.target as Node)) {
         setScopeMenuOpen(false);
       }
+      if (!rangeMenuRef.current?.contains(event.target as Node)) {
+        setRangeMenuOpen(false);
+      }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setScopeMenuOpen(false);
+        setRangeMenuOpen(false);
       }
     }
 
@@ -400,7 +422,7 @@ export function TraceLogsScreen({
     const controller = new AbortController();
 
     fetchJson<TraceOverviewResponse>(
-      `/api/v1/traces/overview?date=${day}&appName=${encodeURIComponent(initialAppName)}&apiName=${encodeURIComponent(initialApiName)}`,
+      `/api/v1/traces/overview?dateFrom=${dayFrom}&dateTo=${dayTo}&appName=${encodeURIComponent(initialAppName)}&apiName=${encodeURIComponent(initialApiName)}`,
       controller.signal
     )
       .then(setOverviewData)
@@ -411,7 +433,7 @@ export function TraceLogsScreen({
       });
 
     return () => controller.abort();
-  }, [day, initialAppName, initialApiName, refreshToken]);
+  }, [dayFrom, dayTo, initialAppName, initialApiName, refreshToken]);
 
   useEffect(() => {
     if (!scopeMenuOpen) {
@@ -422,7 +444,8 @@ export function TraceLogsScreen({
     setScopeLoading(true);
 
     const params = new URLSearchParams();
-    params.set("date", day);
+    params.set("dateFrom", dayFrom);
+    params.set("dateTo", dayTo);
     params.set("page", String(scopePage));
     params.set("size", String(SCOPE_PAGE_SIZE));
     if (scopeQuery.trim()) {
@@ -443,7 +466,7 @@ export function TraceLogsScreen({
       });
 
     return () => controller.abort();
-  }, [day, refreshToken, scopeMenuOpen, scopePage, scopeQuery]);
+  }, [dayFrom, dayTo, refreshToken, scopeMenuOpen, scopePage, scopeQuery]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -511,10 +534,30 @@ export function TraceLogsScreen({
   const warningCount = errorType === "4xx" ? searchData?.totalElements ?? 0 : 0;
   const visibleRows = searchData?.rows ?? [];
   const filterTotal = searchData?.totalElements ?? 0;
-  const isCustomDay = day !== todayIso() && day !== yesterdayIso();
+  const today = todayIso();
+  const yesterday = yesterdayIso();
+  const lastWeekFrom = daysAgoIso(6);
+  const lastMonthFrom = daysAgoIso(29);
+  const isToday = dayFrom === today && dayTo === today;
+  const isYesterday = dayFrom === yesterday && dayTo === yesterday;
+  const isLastWeek = dayFrom === lastWeekFrom && dayTo === today;
+  const isLastMonth = dayFrom === lastMonthFrom && dayTo === today;
+  const derivedRangeMode: RangeSelection = isToday ? "today" : isYesterday ? "yesterday" : isLastWeek ? "lastWeek" : isLastMonth ? "lastMonth" : "custom";
+  const [rangeMode, setRangeMode] = useState<RangeSelection>(derivedRangeMode);
 
-  function openDatePicker() {
-    const input = dateInputRef.current;
+  useEffect(() => {
+    if (rangeMode !== "custom") {
+      setRangeMode(derivedRangeMode);
+    }
+  }, [derivedRangeMode, rangeMode]);
+
+  function setRange(nextFrom: string, nextTo: string) {
+    const normalized = normalizeRange(nextFrom, nextTo);
+    onDayRangeChange(normalized.fromDay, normalized.toDay);
+  }
+
+  function openFromPicker() {
+    const input = dateFromInputRef.current;
     if (!input) {
       return;
     }
@@ -525,8 +568,34 @@ export function TraceLogsScreen({
     input.focus();
   }
 
+  function openToPicker() {
+    const input = dateToInputRef.current;
+    if (!input) {
+      return;
+    }
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+    input.focus();
+  }
+
+  function selectRange(nextRange: RangeSelection) {
+    setRangeMode(nextRange);
+    setRangeMenuOpen(false);
+    if (nextRange === "today") {
+      setRange(today, today);
+    } else if (nextRange === "yesterday") {
+      setRange(yesterday, yesterday);
+    } else if (nextRange === "lastWeek") {
+      setRange(lastWeekFrom, today);
+    } else if (nextRange === "lastMonth") {
+      setRange(lastMonthFrom, today);
+    }
+  }
+
   function applyFilters() {
-    setAppliedFilters(buildFilters(day, initialApiName, initialAppName, filterClauses));
+    setAppliedFilters(buildFilters(dayFrom, dayTo, initialApiName, initialAppName, filterClauses));
     setPage(0);
   }
 
@@ -534,7 +603,7 @@ export function TraceLogsScreen({
     setFilterPreset("correlation");
     setFilterClauses(createClausesForPreset("correlation"));
     setErrorType("2xx");
-    setAppliedFilters(buildDefaultFilters(day, initialApiName, initialAppName));
+    setAppliedFilters(buildDefaultFilters(dayFrom, dayTo, initialApiName, initialAppName));
     setPage(0);
   }
 
@@ -594,37 +663,79 @@ export function TraceLogsScreen({
 
             <div className="trace-header-controls">
               <span className="trace-header-control-label">Day:</span>
-              <div className="trace-header-day-toggle">
-                <button
-                  className={day === todayIso() ? "trace-header-day-button active" : "trace-header-day-button"}
-                  type="button"
-                  onClick={() => onDayChange(todayIso())}
-                >
-                  Today
-                </button>
-                <button
-                  className={day === yesterdayIso() ? "trace-header-day-button active" : "trace-header-day-button"}
-                  type="button"
-                  onClick={() => onDayChange(yesterdayIso())}
-                >
-                  Yesterday
-                </button>
-                <button
-                  className={isCustomDay ? "trace-header-day-button active" : "trace-header-day-button"}
-                  type="button"
-                  onClick={openDatePicker}
-                >
-                  Custom
-                </button>
+              <div className="trace-header-range">
+                <div className="trace-header-range-select-wrap" ref={rangeMenuRef}>
+                  <button
+                    className={`trace-header-range-button ${rangeMenuOpen ? "open" : ""}`}
+                    type="button"
+                    onClick={() => setRangeMenuOpen((value) => !value)}
+                  >
+                    <span>
+                      {rangeMode === "today"
+                        ? "Today"
+                        : rangeMode === "yesterday"
+                          ? "Yesterday"
+                          : rangeMode === "lastWeek"
+                            ? "Last week"
+                            : rangeMode === "lastMonth"
+                              ? "Last month"
+                              : "Custom range"}
+                    </span>
+                    <span className="trace-header-range-arrow" aria-hidden="true" />
+                  </button>
+                  {rangeMenuOpen ? (
+                    <div className="trace-header-range-menu">
+                      <button className={rangeMode === "today" ? "trace-header-range-option active" : "trace-header-range-option"} type="button" onClick={() => selectRange("today")}>
+                        Today
+                      </button>
+                      <button className={rangeMode === "yesterday" ? "trace-header-range-option active" : "trace-header-range-option"} type="button" onClick={() => selectRange("yesterday")}>
+                        Yesterday
+                      </button>
+                      <button className={rangeMode === "lastWeek" ? "trace-header-range-option active" : "trace-header-range-option"} type="button" onClick={() => selectRange("lastWeek")}>
+                        Last week
+                      </button>
+                      <button className={rangeMode === "lastMonth" ? "trace-header-range-option active" : "trace-header-range-option"} type="button" onClick={() => selectRange("lastMonth")}>
+                        Last month
+                      </button>
+                      <button className={rangeMode === "custom" ? "trace-header-range-option active" : "trace-header-range-option"} type="button" onClick={() => selectRange("custom")}>
+                        Custom range
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div className="trace-header-date-field">
-                <button className="trace-header-chip" type="button" onClick={openDatePicker}>
-                  {day.split("-").reverse().join("/")}
-                </button>
-                <label className="trace-toolbar-date-input">
-                  <input ref={dateInputRef} type="date" value={day} onChange={(event) => onDayChange(event.target.value)} />
-                </label>
+                <div className={`trace-date-chips ${rangeMode === "custom" ? "custom-active" : "range-hidden"}`}>
+                  <div className="trace-date-input-chip">
+                    <button className="trace-date-trigger" type="button" onClick={openFromPicker}>
+                      <span className="trace-date-trigger-value">{dayFrom.split("-").reverse().join("/")}</span>
+                      <span className="trace-date-trigger-icon" aria-hidden="true" />
+                    </button>
+                    <input
+                      ref={dateFromInputRef}
+                      className="trace-date-picker-input"
+                      type="date"
+                      value={dayFrom}
+                      onChange={(event) => setRange(event.target.value, dayTo)}
+                      aria-label="From date"
+                    />
+                  </div>
+                  <div className="trace-date-input-chip">
+                    <button className="trace-date-trigger" type="button" onClick={openToPicker}>
+                      <span className="trace-date-trigger-value">{dayTo.split("-").reverse().join("/")}</span>
+                      <span className="trace-date-trigger-icon" aria-hidden="true" />
+                    </button>
+                    <input
+                      ref={dateToInputRef}
+                      className="trace-date-picker-input"
+                      type="date"
+                      value={dayTo}
+                      onChange={(event) => setRange(dayFrom, event.target.value)}
+                      aria-label="To date"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="scope-field trace-header-scope-field" ref={scopeMenuRef}>
                 <button
@@ -717,13 +828,13 @@ export function TraceLogsScreen({
             <span>Total Requests</span>
             <div className="trace-observability-kpi-value-row">
               <strong>{formatCompactNumber(totalRequests)}</strong>
-              <small>{warningCount > 0 ? `${((warningCount / Math.max(totalRequests, 1)) * 100).toFixed(1)}%` : "0.0%"}</small>
             </div>
           </article>
           <article className="trace-observability-kpi">
             <span>Success</span>
             <div className="trace-observability-kpi-value-row">
               <strong>{formatCompactNumber(successCount)}</strong>
+              <small>{totalRequests === 0 ? "0.0%" : `${successRate.toFixed(1)}%`}</small>
             </div>
           </article>
           <article className="trace-observability-kpi danger">
@@ -731,12 +842,6 @@ export function TraceLogsScreen({
             <div className="trace-observability-kpi-value-row">
               <strong>{formatCompactNumber(failureCount)}</strong>
               <small>{failureCount > 0 ? `${((failureCount / Math.max(totalRequests, 1)) * 100).toFixed(1)}%` : "0.0%"}</small>
-            </div>
-          </article>
-          <article className="trace-observability-kpi success">
-            <span>Success Rate</span>
-            <div className="trace-observability-kpi-value-row">
-              <strong>{successRate.toFixed(2)}%</strong>
             </div>
           </article>
           <article className="trace-observability-kpi">
@@ -869,6 +974,7 @@ export function TraceLogsScreen({
                   <th>App Name</th>
                   <th>URL</th>
                   <th>Trace ID</th>
+                  <th>Account Number</th>
                   <th>Channel ID</th>
                   <th>Timestamp</th>
                   <th>Latency Breakdown</th>
@@ -878,7 +984,7 @@ export function TraceLogsScreen({
               <tbody>
                 {visibleRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="empty-cell">
+                    <td colSpan={8} className="empty-cell">
                       {loading ? "Loading traces..." : "No traces match the current filters."}
                     </td>
                   </tr>
@@ -921,6 +1027,7 @@ export function TraceLogsScreen({
                             {row.correlationId || `tr-${row.id}`}
                           </button>
                         </td>
+                        <td className="mono trace-account-cell">{row.accountNumber || "--"}</td>
                         <td className="mono trace-channel-cell">{row.channelId || "--"}</td>
                         <td className="mono trace-timestamp-cell">{formatDateTime(row.requestTimestamp)}</td>
                         <td>
@@ -1021,8 +1128,16 @@ export function TraceLogsScreen({
                       <strong className="mono">{detail.correlationId || "--"}</strong>
                     </div>
                     <div className="detail-card">
+                      <span>Account Number</span>
+                      <strong className="mono">{detail.accountNumber || "--"}</strong>
+                    </div>
+                    <div className="detail-card">
                       <span>Channel ID</span>
                       <strong className="mono">{detail.channelId || "--"}</strong>
+                    </div>
+                    <div className="detail-card">
+                      <span>HTTP status code</span>
+                      <strong className="mono">{detail.httpStatusCode ?? "--"}</strong>
                     </div>
                     <div className="detail-card">
                       <span>Request timestamp</span>
