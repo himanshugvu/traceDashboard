@@ -2433,7 +2433,7 @@ th {
   color: var(--accent);
   font-family: inherit;
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: 500;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2448,7 +2448,7 @@ th {
 
 .trace-app-cell {
   color: var(--text);
-  font-weight: 700;
+  font-weight: 500;
   font-size: 0.78rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2462,6 +2462,7 @@ th {
 .trace-channel-cell {
   color: var(--muted-strong);
   font-size: 0.78rem;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2470,6 +2471,7 @@ th {
 .trace-timestamp-cell {
   color: var(--muted-strong);
   font-size: 0.78rem;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2478,6 +2480,7 @@ th {
 .trace-account-cell {
   color: var(--muted-strong);
   font-size: 0.78rem;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
