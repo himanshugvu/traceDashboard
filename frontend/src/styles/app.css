@@ -2321,6 +2321,8 @@ th {
 
 .trace-results-table-compact {
   min-width: 980px;
+  width: 100%;
+  table-layout: fixed;
 }
 
 .trace-results-table-compact th,
@@ -2330,6 +2332,14 @@ th {
 
 .trace-results-table-compact th {
   font-size: 0.62rem;
+}
+
+.trace-col-app {
+  width: 180px;
+}
+
+.trace-col-correlation {
+  width: 260px;
 }
 
 .table-center {
@@ -2421,9 +2431,15 @@ th {
   padding: 0;
   background: transparent;
   color: var(--accent);
-  font-family: "Cascadia Mono", "Consolas", monospace;
-  font-size: 0.82rem;
+  font-family: inherit;
+  font-size: 0.78rem;
   font-weight: 700;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  text-align: left;
 }
 
 .trace-id-link:hover {
@@ -2433,28 +2449,38 @@ th {
 .trace-app-cell {
   color: var(--text);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.trace-api-cell {
-  display: block;
-}
-
-.trace-api-cell span {
-  display: block;
-  color: var(--muted-strong);
-  font-size: 0.74rem;
-  font-family: "Cascadia Mono", "Consolas", monospace;
+.trace-correlation-cell {
+  overflow: hidden;
 }
 
 .trace-channel-cell {
   color: var(--muted-strong);
-  font-size: 0.74rem;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trace-timestamp-cell {
   color: var(--muted-strong);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-account-cell {
+  color: var(--muted-strong);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .strong-text {
@@ -2882,10 +2908,10 @@ th {
 }
 
 .app-shell.theme-light .trace-id-link,
-.app-shell.theme-light .trace-api-cell span,
+.app-shell.theme-light .trace-account-cell,
 .app-shell.theme-light .trace-channel-cell,
 .app-shell.theme-light .trace-timestamp-cell,
-  .app-shell.theme-light .trace-observability-footer {
+.app-shell.theme-light .trace-observability-footer {
   color: #5c605c;
 }
 

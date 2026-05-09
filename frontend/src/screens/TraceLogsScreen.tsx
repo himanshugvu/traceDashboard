@@ -971,9 +971,8 @@ export function TraceLogsScreen({
             <table className="trace-results-table trace-results-table-compact">
               <thead>
                 <tr>
-                  <th>App Name</th>
-                  <th>URL</th>
-                  <th>Trace ID</th>
+                  <th className="trace-col-app">App Name</th>
+                  <th className="trace-col-correlation">Correlation ID</th>
                   <th>Account Number</th>
                   <th>Channel ID</th>
                   <th>Timestamp</th>
@@ -984,7 +983,7 @@ export function TraceLogsScreen({
               <tbody>
                 {visibleRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="empty-cell">
+                    <td colSpan={7} className="empty-cell">
                       {loading ? "Loading traces..." : "No traces match the current filters."}
                     </td>
                   </tr>
@@ -1008,15 +1007,11 @@ export function TraceLogsScreen({
                         }}
                       >
                         <td className="trace-app-cell">{row.appName || "--"}</td>
-                        <td>
-                          <div className="trace-api-cell">
-                            <span>{formatApiRoute(row.apiName)}</span>
-                          </div>
-                        </td>
-                        <td>
+                        <td className="trace-correlation-cell">
                           <button
                             className="trace-id-link"
                             type="button"
+                            title={row.correlationId || `tr-${row.id}`}
                             onClick={(event) => {
                               event.stopPropagation();
                               setScopeMenuOpen(false);
@@ -1027,9 +1022,9 @@ export function TraceLogsScreen({
                             {row.correlationId || `tr-${row.id}`}
                           </button>
                         </td>
-                        <td className="mono trace-account-cell">{row.accountNumber || "--"}</td>
-                        <td className="mono trace-channel-cell">{row.channelId || "--"}</td>
-                        <td className="mono trace-timestamp-cell">{formatDateTime(row.requestTimestamp)}</td>
+                        <td className="trace-account-cell">{row.accountNumber || "--"}</td>
+                        <td className="trace-channel-cell">{row.channelId || "--"}</td>
+                        <td className="trace-timestamp-cell">{formatDateTime(row.requestTimestamp)}</td>
                         <td>
                           <div className={`trace-latency-breakdown ${tone}`}>
                             <div className="trace-latency-bar">
@@ -1092,7 +1087,7 @@ export function TraceLogsScreen({
               <div className="drawer-title-block">
                 <p className="eyebrow">End-to-end trace</p>
                 <h3>Record #{selectedTraceId}</h3>
-                <p className="drawer-subtitle">{`${detail?.appName || "--"} / ${detail?.apiName || "--"}`}</p>
+                <p className="drawer-subtitle">{`${detail?.appName || "--"} / ${formatApiRoute(detail?.apiName) || "--"}`}</p>
               </div>
               <button className="icon-close" type="button" onClick={() => setSelectedTraceId(null)}>
                 Close
@@ -1116,8 +1111,8 @@ export function TraceLogsScreen({
                       <strong>{detail.status || "--"}</strong>
                     </div>
                     <div className="detail-card">
-                      <span>API name</span>
-                      <strong>{detail.apiName || "--"}</strong>
+                      <span>URL</span>
+                      <strong className="mono">{formatApiRoute(detail.apiName) || "--"}</strong>
                     </div>
                     <div className="detail-card">
                       <span>App name</span>
